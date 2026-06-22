@@ -9,3 +9,6 @@
 | `vision-mission.md` | ビジョン・ミッション・バリュー |
 | `annual-plan/` | 年度ごとの事業計画 |
 | `meeting-notes/` | 方針会議・経営会議のメモ |
+
+
+・あいうえお
