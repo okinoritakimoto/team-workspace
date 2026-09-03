@@ -1,0 +1,104 @@
+# names.yml — 差し替え台帳（この repo の固有名の正本）
+#
+# 構造の中の差し替え点（キー名を二重の波かっこで囲んだ印）は、すべてここに書いた value で置き換わる。
+# この repo は見本の名前が入った状態（差し替え点は残っていない）。先方の名前が決まったら value を直して、次を順に1回ずつ実行する:
+#   python3 tools/apply_names.py --rename   # 文章の名前を入れ替える（前の値は names.applied.yml に控えてある）
+#   python3 tools/apply_names.py --check    # 文章に残りが無いことを確認（exit 0）
+#   python3 tools/build_dashboard.py        # 画面に名前が入る（続けて --check で一致を確認）
+# 差し替え点（二重の波かっこ）が残っている新しい写しでは、--rename ではなく引数なしで1回実行する。
+# 任意キー（下の required: false）は未記入のままでよい。その時も exit 0 で、警告は出ない。
+# 実行する場所: この repo の直下（この names.yml と同じ階層）。
+#
+# 書式は「keys: → KEY: → 4欄（value / sample / required / description）」の3段だけ。
+# value = 本番の値（空のままだと required のキーは適用時に止まる）／ sample = 試し用・モック用の値。
+# ここに個人のメールアドレス・電話番号・鍵は書かない（氏名は先方と合意した表記だけ）。
+#
+# 同じ1回で、計器盤（60_outputs/dashboard/index.html）の「だれの・どのプロジェクトか」の欄も変わる。
+# 画面には差し替え点（形: 二重の波かっこ）を置かないので、値の文字だけを差し替える（書式は1文字も変えない）:
+#   PROJECT_ID          → project.id
+#   PROJECT_NAME_JA     → project.name
+#   ORG_NAME_JA         → project.org
+#   OUR_ORG_NAME_JA     → project.our_org
+#   PM_NAME             → project.pm
+#   LEADER_NAME         → project.leader
+#   PERIOD_START        → project.period.start
+#   PERIOD_END          → project.period.end（画面では KGI の期限にも使う）
+#   WEEKLY_MEETING_SLOT → next_meeting.slot_label（会議の「リズム」。個々の開催日 next_meeting.date は動かない）
+# これ以外（数字・タスク・リスク・会議の日付）は正本 20_project/ を直し、python3 tools/build_dashboard.py で画面にする。
+#
+# 期間（PERIOD_START / PERIOD_END）は、見本のあいだは見本の日付（2026-08-17 / 2026-11-27）のまま。
+# 本当の期間に変える時は、00_charter.md・01_plan.md（フェーズ・面談期間）・03_dashboard.md（基準日）も同じ会議の前に直す
+# （見本の日付は互いに噛み合った1組。食い違いは python3 tools/build_dashboard.py の検査が止める）。
+schema: talent-pj-names/v1
+
+keys:
+  ORG_NAME_JA:
+    value: "サンプル株式会社"
+    sample: "サンプル株式会社"
+    required: true
+    description: "先方（プロジェクトの持ち主）の組織名・日本語表記"
+  REPO_NAME:
+    value: "talent-sample"
+    sample: "talent-project-sample"
+    required: true
+    description: "このフォルダの名前（英小文字・ハイフン）。案件を増やすときは、支援側が見本の履歴を除いた初期状態を作り、ここをそのフォルダ名にする（見本を丸ごと複製しない）"
+  PROJECT_ID:
+    value: "PJ-2026Q3-talent-sample"
+    sample: "PJ-2026Q3-talent-sample"
+    required: true
+    description: "プロジェクトID。形は PJ-<年>Q<期>-<slug>（例: PJ-2026Q3-talent-onboarding）"
+  PROJECT_NAME_JA:
+    value: "人材プロジェクト（サンプル）"
+    sample: "人材プロジェクト（サンプル）"
+    required: true
+    description: "プロジェクト名・日本語（画面と憲章の見出しに出る）"
+  PROJECT_SLUG:
+    value: "talent-sample"
+    sample: "talent-sample"
+    required: true
+    description: "会議録などのファイル名に使う短い英字（例: talent-onboarding）。PROJECT_ID の末尾と揃える"
+  LEADER_NAME:
+    value: "リーダー（サンプル）"
+    sample: "リーダー（サンプル）"
+    required: true
+    description: "先方のリーダー（ダッシュボードの読み手・重要な決定の承認に関わる人）の表記"
+  PM_NAME:
+    value: "PM（サンプル）"
+    sample: "PM（サンプル）"
+    required: true
+    description: "責任者（PM）。計器盤を更新し、会議を回し、タスク化を締める1人"
+  APPROVER_NAME:
+    value: "承認者（サンプル）"
+    sample: "承認者（サンプル）"
+    required: true
+    description: "憲章に GO を出す人（責任者と別人が望ましい。リーダーと同一なら同じ表記でよい）"
+  OUR_ORG_NAME_JA:
+    value: "支援側（サンプル）"
+    sample: "支援側（サンプル）"
+    required: true
+    description: "支援する側（この構造を持ち込む側）の名乗り"
+  OUR_CONTACT_NAME:
+    value: "支援側担当（サンプル）"
+    sample: "支援側担当（サンプル）"
+    required: false
+    description: "支援側の担当者の表記（任意。空なら差し替え点はそのまま残る。空のままでも完了＝exit 0）"
+  PERIOD_START:
+    value: "2026-08-17"
+    sample: "2026-08-17"
+    required: true
+    description: "プロジェクト期間の開始日（YYYY-MM-DD）。見本のあいだは 2026-08-17 のまま。変える時は 00_charter・01_plan・03_dashboard の日付と一緒に（食い違いは build_dashboard の検査が止める）"
+  PERIOD_END:
+    value: "2026-11-27"
+    sample: "2026-11-27"
+    required: true
+    description: "プロジェクト期間の終了日（YYYY-MM-DD）。見本のあいだは 2026-11-27 のまま（PERIOD_START と同じ理由）。延長は無い — 続けるなら別IDで再発足。画面では KGI の期限にも使う"
+  WEEKLY_MEETING_SLOT:
+    value: "毎週月曜 09:00〜10:00（サンプル）"
+    sample: "毎週月曜 09:00〜10:00（サンプル）"
+    required: true
+    description: "週次運転会議の曜日・時刻（固定する。これが決まらないと運転が始まらない）。画面の会議欄のリズム表示にも入る"
+  DASHBOARD_URL:
+    value: ""
+    sample: "（公開後に記入）"
+    required: false
+    description: "運転席の公開URL。この配布キット（公開の置き場）には書かない — URL は手引きで PM が配る。空のままでよい"

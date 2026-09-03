@@ -1,0 +1,2659 @@
+<!--
+  プロジェクトの運転席（投影） — 手で書き換えない。
+  生成元の正本: 20_project/（計器盤 03_dashboard.md ほか）。
+    データ層（id が dashboard-data の application/json ブロック）は tools/build_dashboard.py が正本から生成する（元の数だけ・派生値なし）。
+    表示層（この HTML/CSS/JS）が達成%・実行率・必要ペース・今日までの予定・遅れ・週番号・着地の見込み・持ちタスク数を計算する。
+    表示層は JSON 以外を読まない（軸の上限など描画用の定数だけを持つ）。
+  トークンの出所: Design DNA v2.8（dna.css）の写し — 正本ではない（正本は支援側が管理する）。
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プロジェクト運転席</title>
+<style>
+/* ============================================================
+   1. トークン（Design DNA v2.8 dna.css の写し — :root 1か所）
+   ============================================================ */
+:root{
+  --dna-bg:#ffffff; --dna-surface:#ffffff; --dna-surface-2:#f7f8fa;
+  --dna-border:rgba(18,20,26,.07); --dna-border-strong:rgba(18,20,26,.13);
+  --dna-hairline:#f2f3f5; --dna-hairline-crisp:rgba(18,20,26,.12); --dna-badge-bg:#ececee;
+  --dna-tab-on-bg:#e8f1fa; --dna-tab-on-ink:#10395c;
+  --dna-tb-face:rgba(18,90,140,.05); --dna-tb-face-hover:rgba(18,90,140,.1);
+  --dna-tb-line:rgba(18,90,140,.15); --dna-tb-line-soft:rgba(18,90,140,.1);
+  --dna-radius-lg:22px; --dna-radius:16px; --dna-radius-sm:10px;
+  --dna-shadow:0 1px 2px rgba(16,18,26,.04),0 10px 30px rgba(16,18,26,.055);
+  --dna-shadow-hover:0 2px 4px rgba(16,18,26,.05),0 16px 40px rgba(16,18,26,.09);
+  --dna-ink:#191a1c; --dna-ink-2:#5c6066; --dna-ink-3:#767b82; --dna-ink-faint:#b9bcc2;
+  --dna-up:#12833f; --dna-down:#d93025; --dna-link:#1a6ef5; --dna-chart:#3e83f8; --dna-chart-soft:#aac6f7; --dna-late:#c4554d;
+  --dna-pill-up-bg:#e5f5eb; --dna-pill-up-ink:#0f7a39;
+  --dna-pill-warn-bg:#fdf1dc; --dna-pill-warn-ink:#a05f00;
+  --dna-pill-down-bg:#fdeae8; --dna-pill-down-ink:#c22b20;
+  --dna-pill-info-bg:#e7effe; --dna-pill-info-ink:#1a5fd0;
+  --dna-pill-neutral-bg:#eef0f2;
+  --dna-chart-green:#22a04d; --dna-chart-band:#e2ebfc;
+  --dna-control-on:var(--dna-link); --dna-control-off:#d4d7dc; --dna-progress-track:#eef0f3;
+  --dna-grad-a:#2f7bf2; --dna-grad-b:#35c3e8;
+  --dna-grad-h:linear-gradient(90deg,var(--dna-grad-a),var(--dna-grad-b));
+  --dna-grad-ring:linear-gradient(135deg,var(--dna-grad-a),var(--dna-grad-b) 85%);
+  --dna-btn-grad:linear-gradient(135deg,#2464ec,#0d7cad); --dna-btn-grad-ink:#ffffff;
+  --dna-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  --dna-fs-title:21px; --dna-fs-section:16px; --dna-fs-subject:15px; --dna-fs-body:14px; --dna-fs-sub:13.5px; --dna-fs-small:12.5px; --dna-fs-hero:27px;
+  --dna-gap:16px; --dna-pad:20px 22px;
+  --dna-motion-fast:.15s; --dna-motion-base:.18s; --dna-motion-slow:.34s;
+  --dna-ease-out:cubic-bezier(.2,0,0,1); --dna-ease-inout:cubic-bezier(.4,0,.2,1);
+  /* 描画用（page-local） */
+  --tp-ava-bg:#ccd9ef; --tp-ava-ink:#2f4a7d; --tp-minibar:#e9eaee; --tp-grid:#eeeff2;
+  --tkb-lane-shadow:0 1px 2px rgba(16,18,26,.04),0 8px 22px rgba(16,18,26,.05);
+  --tkb-card-shadow-hover:0 2px 4px rgba(16,18,26,.05),0 10px 24px rgba(16,18,26,.09);
+  --tkb-lane-gap:14px; --tkb-lane-width:minmax(0,1fr);
+}
+html[data-color-theme="dark"]{
+  --dna-bg:#1b1c1f; --dna-surface:#232428; --dna-surface-2:#2b2c31;
+  --dna-border:rgba(255,255,255,.09); --dna-border-strong:rgba(255,255,255,.16);
+  --dna-hairline:rgba(255,255,255,.07); --dna-hairline-crisp:rgba(255,255,255,.12); --dna-badge-bg:#3a3b3f;
+  --dna-tab-on-bg:rgba(255,255,255,.1); --dna-tab-on-ink:#e8eaed;
+  --dna-tb-face:rgba(255,255,255,.08); --dna-tb-face-hover:rgba(255,255,255,.12);
+  --dna-tb-line:rgba(255,255,255,.16); --dna-tb-line-soft:rgba(255,255,255,.08);
+  --dna-shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.35);
+  --dna-shadow-hover:0 2px 4px rgba(0,0,0,.35),0 18px 44px rgba(0,0,0,.45);
+  --dna-ink:#e8eaed; --dna-ink-2:#9aa0a6; --dna-ink-3:#80868b; --dna-ink-faint:#5f6368;
+  --dna-up:#81c995; --dna-down:#f28b82; --dna-link:#8ab4f8; --dna-chart:#8ab4f8; --dna-chart-soft:#4a5b78; --dna-late:#f28b82;
+  --dna-pill-up-bg:rgba(129,201,149,.16); --dna-pill-up-ink:#81c995;
+  --dna-pill-warn-bg:rgba(253,214,99,.14); --dna-pill-warn-ink:#fdd663;
+  --dna-pill-down-bg:rgba(242,139,130,.15); --dna-pill-down-ink:#f28b82;
+  --dna-pill-info-bg:rgba(138,180,248,.16); --dna-pill-info-ink:#8ab4f8;
+  --dna-pill-neutral-bg:rgba(255,255,255,.09);
+  --dna-chart-band:rgba(138,180,248,.22);
+  --dna-control-off:#4a4d52; --dna-progress-track:#2c2d31;
+  --dna-grad-a:#6ba4f8; --dna-grad-b:#58c8e6;
+  --dna-btn-grad:linear-gradient(135deg,#6ba4f8,#58c8e6); --dna-btn-grad-ink:#17181a;
+  --tp-ava-bg:#3a4a63; --tp-ava-ink:#cdd9ee; --tp-minibar:#3a3b3f; --tp-grid:#2c2d31;
+  --tkb-lane-shadow:0 1px 2px rgba(0,0,0,.3),0 10px 26px rgba(0,0,0,.34);
+  --tkb-card-shadow-hover:0 2px 4px rgba(0,0,0,.35),0 12px 28px rgba(0,0,0,.42);
+}
+
+/* ============================================================
+   2. 地・床（操作の床 = dna.css §10 の写し）
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{background:var(--dna-bg)}
+body{
+  font-family:var(--dna-font);color:var(--dna-ink);background:var(--dna-bg);
+  font-size:var(--dna-fs-body);font-weight:500;line-height:1.55;letter-spacing:0;
+  font-feature-settings:"tnum";-webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+[hidden]{display:none !important}
+html[data-live] [data-sample-only]{ display:none !important; }
+a{color:var(--dna-link)}
+b,strong{font-weight:600}
+button{font-family:inherit}
+:where(button,a,input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--dna-chart-soft);outline-offset:1px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
+mark{background:var(--dna-pill-info-bg);color:inherit;border-radius:4px;padding:0 3px}
+.tp-num{font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
+.tp-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ============================================================
+   3. 器（キャンバス・題・切り替え行・脚）
+   ============================================================ */
+.dna-canvas{max-width:1240px;margin:0 auto;padding:18px 20px 72px;position:relative}
+.tp-errband{
+  display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:12px 16px;border-radius:12px;
+  background:var(--dna-pill-down-bg);color:var(--dna-pill-down-ink);font-size:var(--dna-fs-sub);font-weight:600;line-height:1.5;
+  box-shadow:inset 0 0 0 1px rgba(194,43,32,.25);
+}
+body.is-broken main{display:none}
+.tp-head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.tp-head-l{flex:1 1 420px;min-width:0}
+.tp-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0;font-size:var(--dna-fs-title);font-weight:600;letter-spacing:.01em;line-height:1.3}
+.tp-title .dna-status{font-size:12.5px}
+.tp-sub{margin:6px 0 0;font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink-3);display:flex;flex-wrap:wrap;gap:4px 0}
+.tp-sub .sep{margin:0 8px;color:var(--dna-ink-faint)}
+.tp-sub b{font-weight:600;color:var(--dna-ink-2)}
+.tp-head-r{display:inline-flex;align-items:center;gap:10px;flex:none;padding-top:2px}
+.tp-nav{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 0;
+  padding-bottom:8px;border-bottom:1px solid var(--dna-tb-line-soft);
+}
+.tp-scope{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink-2)}
+.tp-select{
+  font-family:var(--dna-font);font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink);
+  background:var(--dna-surface);border:1px solid var(--dna-border-strong);border-radius:var(--dna-radius-sm);
+  padding:6px 30px 6px 10px;appearance:none;-webkit-appearance:none;max-width:220px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--dna-ink-3) 50%),linear-gradient(135deg,var(--dna-ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+}
+.tp-headline{
+  display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin:12px 0 0;
+  font-size:var(--dna-fs-body);font-weight:500;color:var(--dna-ink);line-height:1.55;
+}
+.tp-headline .k{flex:none;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink-3);letter-spacing:.04em;padding-top:2px}
+.tp-headline .t{flex:1 1 320px;min-width:0}
+.tp-headline .t b{font-weight:600}
+.tp-headline .more{flex:none}
+.tp-foot{margin:28px 0 0;padding-top:14px;border-top:1px solid var(--dna-hairline);font-size:var(--dna-fs-small);font-weight:500;color:var(--dna-ink-3);line-height:1.7}
+.tp-gloss-wrap{margin:0 0 10px}
+.tp-gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 22px;padding-top:2px}
+.tp-gloss > div{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:5px 0;border-bottom:1px solid var(--dna-hairline);font-size:13px;line-height:1.5}
+.tp-gloss b{font-weight:600;color:var(--dna-ink)}
+.tp-gloss span{color:var(--dna-ink-2);font-weight:400}
+.tp-foot b{font-weight:600;color:var(--dna-ink-2)}
+main > section{margin-top:14px}
+
+/* ============================================================
+   4. DNA 部品（dna.css の該当規則を page-local へ写し・scope は .dna-canvas）
+   ============================================================ */
+/* 白カード（§5） */
+.dna-canvas .dna-card{
+  background:var(--dna-surface);border:1px solid var(--dna-border);border-radius:var(--dna-radius);
+  box-shadow:var(--dna-shadow);padding:var(--dna-pad);min-width:0;
+  transition:box-shadow var(--dna-motion-base) ease;
+}
+.dna-canvas .dna-card:hover{box-shadow:var(--dna-shadow-hover)}
+.dna-canvas .dna-metric-label{display:inline-flex;align-items:center;gap:7px;font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink-2)}
+.dna-canvas .dna-metric-label svg{width:15px;height:15px;stroke:var(--dna-ink-3);fill:none;flex:none}
+.dna-canvas .dna-metric-label .u{border-bottom:1px dotted var(--dna-ink-faint);padding-bottom:2px}
+/* KPI（§5） */
+.dna-canvas .dna-kpi-body{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 12px;margin-top:10px;flex-wrap:wrap}
+.dna-canvas .dna-kpi-value{display:flex;align-items:baseline;gap:8px;min-width:0}
+.dna-canvas .dna-kpi-value b{font-size:var(--dna-fs-hero);font-weight:650;letter-spacing:-.4px;color:var(--dna-ink);white-space:nowrap}
+.dna-canvas .dna-kpi-value .unit{font-size:15px;font-weight:600;color:var(--dna-ink-2)}
+.dna-canvas .dna-delta{font-size:13px;font-weight:600;white-space:nowrap;color:var(--dna-ink-3)}
+.dna-canvas .dna-delta.up{color:var(--dna-up)}
+.dna-canvas .dna-delta.down{color:var(--dna-down)}
+/* 状態ピル（§9） */
+.dna-canvas .dna-status{display:inline-flex;align-items:center;border-radius:999px;font-size:12.5px;font-weight:600;padding:4px 11px;line-height:1.4;white-space:nowrap}
+.dna-canvas .dna-status.up{background:var(--dna-pill-up-bg);color:var(--dna-pill-up-ink)}
+.dna-canvas .dna-status.warn{background:var(--dna-pill-warn-bg);color:var(--dna-pill-warn-ink)}
+.dna-canvas .dna-status.down{background:var(--dna-pill-down-bg);color:var(--dna-pill-down-ink)}
+.dna-canvas .dna-status.info{background:var(--dna-pill-info-bg);color:var(--dna-pill-info-ink)}
+.dna-canvas .dna-status.is-neutral{background:var(--dna-pill-neutral-bg);color:var(--dna-ink-2)}
+.dna-canvas .dna-status.is-review{gap:6px;background:var(--dna-surface);color:var(--dna-link);box-shadow:inset 0 0 0 1.5px rgba(26,110,245,.35)}
+.dna-canvas .dna-status.is-review i{width:5px;height:5px;border-radius:50%;flex:none;background:var(--dna-surface);border:2px solid var(--dna-link)}
+html[data-color-theme="dark"] .dna-canvas .dna-status.is-review{box-shadow:inset 0 0 0 1.5px rgba(138,180,248,.45)}
+/* カテゴリタグ（§11） */
+.dna-canvas .dna-tag{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border-radius:7px;padding:4px 10px;line-height:1.4;white-space:nowrap}
+.dna-canvas .dna-tag.t-blue{background:var(--dna-pill-info-bg);color:var(--dna-pill-info-ink)}
+.dna-canvas .dna-tag.t-green{background:var(--dna-pill-up-bg);color:var(--dna-pill-up-ink)}
+.dna-canvas .dna-tag.t-amber{background:var(--dna-pill-warn-bg);color:var(--dna-pill-warn-ink)}
+.dna-canvas .dna-tag.t-neutral{background:var(--dna-pill-neutral-bg);color:var(--dna-ink-2)}
+/* ボタン（§4） */
+.dna-canvas button.dna-btn{
+  display:inline-flex;align-items:center;gap:7px;font-family:var(--dna-font);font-size:var(--dna-fs-sub);font-weight:600;
+  color:var(--dna-ink);background:var(--dna-surface);border:1px solid var(--dna-border-strong);border-radius:var(--dna-radius-sm);
+  padding:8px 14px;cursor:pointer;line-height:1.2;box-shadow:0 1px 2px rgba(16,18,26,.04);
+  transition:background .15s ease,box-shadow .15s ease;
+}
+.dna-canvas button.dna-btn:hover{background:var(--dna-surface-2);box-shadow:0 2px 6px rgba(16,18,26,.08)}
+.dna-canvas button.dna-btn svg{width:16px;height:16px;stroke:var(--dna-ink-2);fill:none;flex:none}
+/* アバター（xc-ava16・zkc-avatar の段） */
+.dna-canvas .xc-ava16{width:16px;height:16px;border-radius:50%;flex:none;background:var(--tp-ava-bg);color:var(--tp-ava-ink);display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;line-height:1}
+.dna-canvas .tp-ava{width:22px;height:22px;border-radius:50%;flex:none;background:var(--tp-ava-bg);color:var(--tp-ava-ink);display:inline-grid;place-items:center;font-size:11.5px;font-weight:600;line-height:1}
+.dna-canvas .tp-ava40{width:40px;height:40px;border-radius:50%;flex:none;background:var(--tp-ava-bg);color:var(--tp-ava-ink);display:grid;place-items:center;font-size:15px;font-weight:600;line-height:1}
+.dna-canvas .tp-who{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:13px;font-weight:500;color:var(--dna-ink);white-space:nowrap}
+.dna-canvas .tp-who small{font-size:13px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* 作業面ツールバー（§11 .dna-tb-*） */
+.dna-canvas .dna-tb-bar{display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--dna-tb-line-soft)}
+.dna-canvas .dna-tb-views{display:inline-flex;align-items:center;gap:2px}
+.dna-canvas .dna-tb-view{
+  display:inline-flex;align-items:center;gap:7px;font-family:var(--dna-font);font-size:13.5px;font-weight:600;color:var(--dna-ink-2);
+  background:transparent;border:0;border-radius:7px;padding:7px 12px;cursor:pointer;text-decoration:none;
+  transition:background .15s ease,color .15s ease;
+}
+.dna-canvas .dna-tb-view svg{width:15px;height:15px;stroke:currentColor;fill:none;opacity:.85}
+.dna-canvas .dna-tb-view:hover{background:rgba(18,90,140,.06);color:var(--dna-ink)}
+html[data-color-theme="dark"] .dna-canvas .dna-tb-view:hover{background:rgba(138,180,248,.1)}
+.dna-canvas .dna-tb-view.on{background:var(--dna-tab-on-bg);color:var(--dna-tab-on-ink)}
+.dna-canvas .dna-tb-right{margin-left:auto;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.dna-canvas .dna-tb-count{font-size:12.5px;font-weight:600;color:var(--dna-ink-3);font-feature-settings:"tnum";white-space:nowrap;margin:0 4px 0 6px}
+.dna-canvas .dna-tb-sample{
+  display:inline-flex;align-items:center;gap:5px;margin-left:6px;font-size:11.5px;font-weight:600;color:var(--dna-pill-warn-ink);
+  background:var(--dna-pill-warn-bg);border-radius:7px;padding:4px 9px;white-space:nowrap;box-shadow:inset 0 0 0 1px rgba(168,101,0,.28);cursor:help;
+}
+html[data-color-theme="dark"] .dna-canvas .dna-tb-sample{box-shadow:inset 0 0 0 1px rgba(253,214,99,.3)}
+.dna-canvas .dna-tb-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap;width:100%;margin-top:9px}
+.dna-canvas .dna-tb-chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--dna-font);font-size:12.5px;font-weight:600;line-height:1;color:var(--dna-ink);
+  background:var(--dna-tb-face);border:1px solid transparent;border-radius:999px;padding:5.5px 11px;cursor:pointer;white-space:nowrap;
+  transition:background .15s ease;
+}
+.dna-canvas .dna-tb-chip:hover{background:var(--dna-tb-face-hover)}
+.dna-canvas .dna-tb-chip .k{font-weight:500;color:var(--dna-ink-3)}
+.dna-canvas .dna-tb-chip .n{font-weight:500;color:var(--dna-ink-3);font-feature-settings:"tnum"}
+.dna-canvas .dna-tb-chip.active{
+  border:1px solid transparent;padding:5.5px 11px;color:var(--dna-pill-info-ink);
+  background:linear-gradient(var(--dna-surface),var(--dna-surface)) padding-box,var(--dna-grad-ring) border-box;
+}
+html[data-color-theme="dark"] .dna-canvas .dna-tb-chip.active{color:#8ab4f8}
+.dna-canvas .dna-tb-chip.ghost{color:var(--dna-ink-faint);font-weight:500}
+.dna-canvas .tp-tb-sep{width:1px;height:18px;background:var(--dna-tb-line);margin:0 4px}
+.dna-canvas .tp-tb-select{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.dna-canvas .tp-tb-select .tp-select{font-size:12.5px;padding:4px 26px 4px 9px;border-radius:999px;border-color:transparent;background-color:var(--dna-tb-face)}
+/* 開閉（§11 .dna-fold の機構を薄い行へ — page-local .tp-fold） */
+.dna-canvas .tp-fold{margin-top:8px}
+.dna-canvas button.tp-fold-row{
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 8px 0 4px;margin-left:-4px;border:0;border-radius:8px;
+  background:transparent;font:inherit;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink-2);cursor:pointer;text-align:left;
+  transition:background .15s ease;
+}
+.dna-canvas button.tp-fold-row:hover{background:var(--dna-surface-2)}
+.dna-canvas .tp-fold-row .chev{width:14px;height:14px;flex:none;color:var(--dna-ink-3);transition:transform .2s ease;stroke:currentColor;fill:none}
+.dna-canvas .tp-fold.is-open .tp-fold-row .chev{transform:rotate(90deg)}
+.dna-canvas .tp-fold-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dna-motion-slow) cubic-bezier(.3,.9,.35,1)}
+.dna-canvas .tp-fold.is-open .tp-fold-body{grid-template-rows:1fr}
+.dna-canvas .tp-fold-body .inner{min-height:0;overflow:hidden}
+.dna-canvas .tp-fold.is-open .tp-fold-body .inner{padding:4px 0 6px 2px}
+.dna-canvas .tp-fold-body .li{display:flex;gap:12px;align-items:baseline;padding:3px 0}
+.dna-canvas .tp-fold-body .li span{flex:none;width:84px;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink-3)}
+.dna-canvas .tp-fold-body .li b{font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink);min-width:0}
+.dna-canvas .tp-fold-body p{margin:0;font-size:var(--dna-fs-sub);font-weight:400;color:var(--dna-ink-2);line-height:1.6}
+/* 期限の遅れ（§11 .dna-due） */
+.dna-canvas .dna-due{display:inline-flex;align-items:baseline;gap:5px;font-size:14px;font-weight:500;color:var(--dna-ink);font-feature-settings:"tnum";white-space:nowrap}
+.dna-canvas .dna-due .late{font-size:11.5px;font-weight:600;color:var(--dna-late);font-style:normal}
+.dna-canvas .dna-due.is-done{color:var(--dna-ink-faint)}
+/* セクション見出し行 eyebrow（§11d） */
+.dna-canvas .dna-eyebrow-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:30px;margin:18px 0 10px}
+.dna-canvas .dna-eyebrow-row > .right{margin-left:auto;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dna-canvas .dna-eyebrow{display:inline-flex;align-items:center;gap:7px;min-width:0;margin:0;font:700 11.5px/1 var(--dna-font);letter-spacing:.24em;text-transform:uppercase;color:var(--dna-ink-3);white-space:nowrap}
+.dna-canvas .dna-eyebrow svg{width:14px;height:14px;flex:none;stroke:var(--dna-chart);fill:none}
+.dna-canvas .dna-eyebrow .sub{font-weight:500;letter-spacing:.12em;color:var(--dna-ink-faint);text-transform:none;overflow:hidden;text-overflow:ellipsis}
+/* 読ませる表・薄行版（§11/§11b .dna-t2.is-dense） */
+.dna-canvas .dna-t2-card{padding:8px 8px 2px;overflow:hidden;width:100%}
+.dna-canvas .dna-t2-scroll{width:100%;overflow-x:auto}
+.dna-canvas .dna-t2{--dna-t2-cols:36px minmax(0,1.7fr) minmax(150px,0.9fr) 118px 120px minmax(0,1fr);min-width:900px}
+.dna-canvas .dna-t2-row > *{min-width:0}
+.dna-canvas .dna-t2-row .tp-who{max-width:100%}
+.dna-canvas .dna-t2-head{display:grid;grid-template-columns:var(--dna-t2-cols);align-items:center;height:36px;padding:0 8px;background:var(--dna-surface-2);border-radius:10px}
+.dna-canvas .dna-t2-head span{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--dna-ink-3)}
+.dna-canvas .dna-t2-row{display:grid;grid-template-columns:var(--dna-t2-cols);align-items:center;min-height:43px;padding:0 8px;border-bottom:1px solid var(--dna-hairline-crisp);transition:background .13s ease}
+.dna-canvas .dna-t2-row:hover{background:var(--dna-surface-2)}
+.dna-canvas .dna-t2-row.is-me{box-shadow:inset 3px 0 0 var(--dna-chart)}
+.dna-canvas .dna-t2 .dna-status{font-size:11px;padding:2.5px 8px}
+.dna-canvas .dna-t2 .dna-due{font-size:13px}
+.dna-canvas .xc-comp{display:flex;align-items:center;gap:10px;min-width:0;padding-right:14px}
+.dna-canvas .xc-comp .n{font-size:13.5px;font-weight:500;color:var(--dna-ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dna-canvas .xc-desc{font-size:13.5px;font-weight:400;color:var(--dna-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:14px}
+.dna-canvas .tp-t2-detail{grid-column:1 / -1;padding:2px 8px 12px 44px;border-bottom:1px solid var(--dna-hairline-crisp);background:var(--dna-surface-2)}
+.dna-canvas .tp-t2-detail .li{display:flex;gap:12px;align-items:baseline;padding:3px 0}
+.dna-canvas .tp-t2-detail .li span{flex:none;width:84px;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink-3)}
+.dna-canvas .tp-t2-detail .li b{font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink);min-width:0}
+.dna-canvas button.tp-rowtgl{
+  width:26px;height:26px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--dna-ink-3);cursor:pointer;display:inline-grid;place-items:center;
+  transition:background .15s ease,color .15s ease;
+}
+.dna-canvas button.tp-rowtgl:hover{background:var(--dna-surface);color:var(--dna-ink)}
+.dna-canvas button.tp-rowtgl svg{width:14px;height:14px;stroke:currentColor;fill:none;transition:transform .2s ease}
+.dna-canvas button.tp-rowtgl[aria-expanded="true"] svg{transform:rotate(90deg)}
+.dna-canvas .dna-t2-foot{margin:0;padding:12px 10px 10px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3);line-height:1.7}
+/* 看板（§11c .tkb-*） */
+.dna-canvas .tkb-kan{
+  display:grid;grid-auto-flow:column;grid-auto-columns:var(--tkb-lane-width);gap:var(--tkb-lane-gap);align-items:start;
+  margin-top:12px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--dna-chart-soft) transparent;
+}
+.dna-canvas .tkb-kan::-webkit-scrollbar{height:7px}
+.dna-canvas .tkb-kan::-webkit-scrollbar-thumb{background:var(--dna-chart-soft);border-radius:999px}
+.dna-canvas .tkb-col{display:flex;flex-direction:column;min-width:0;background:var(--dna-surface);border:1px solid var(--dna-border);border-radius:12px;box-shadow:var(--tkb-lane-shadow);overflow:hidden}
+.dna-canvas .tkb-col-rail{height:3px;flex:0 0 auto}
+.dna-canvas .tkb-col.is-todo .tkb-col-rail{background:var(--dna-ink-faint)}
+.dna-canvas .tkb-col.is-doing .tkb-col-rail{background:var(--dna-chart)}
+.dna-canvas .tkb-col.is-review .tkb-col-rail{background:repeating-linear-gradient(90deg,var(--dna-chart) 0 10px,var(--dna-chart-soft) 10px 20px)}
+.dna-canvas .tkb-col.is-blocked .tkb-col-rail{background:var(--dna-down)}
+.dna-canvas .tkb-col.is-done .tkb-col-rail{background:var(--dna-up)}
+.dna-canvas .tkb-col-head{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
+.dna-canvas .tkb-col-head i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.dna-canvas .tkb-col.is-todo .tkb-col-head i{background:var(--dna-ink-faint)}
+.dna-canvas .tkb-col.is-doing .tkb-col-head i{background:var(--dna-chart)}
+.dna-canvas .tkb-col.is-review .tkb-col-head i{background:var(--dna-surface);border:2px solid var(--dna-chart)}
+.dna-canvas .tkb-col.is-blocked .tkb-col-head i{background:var(--dna-down)}
+.dna-canvas .tkb-col-head b{flex:0 1 auto;min-width:0;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dna-canvas .tkb-col-n{flex:none;font-size:var(--dna-fs-section);font-weight:400;color:var(--dna-ink-3);font-feature-settings:"tnum";line-height:1}
+.dna-canvas .tkb-col-body{display:grid;gap:9px;padding:2px 12px 12px;align-content:start}
+.dna-canvas .tkb-task[tabindex]{
+  position:relative;display:grid;gap:8px;min-width:0;background:var(--dna-surface);border:1px solid var(--dna-border-strong);
+  border-radius:10px;padding:11px 12px 10px;cursor:pointer;
+  transition:box-shadow var(--dna-motion-base) ease,border-color var(--dna-motion-fast) ease;
+}
+.dna-canvas .tkb-task[tabindex]:hover{box-shadow:var(--tkb-card-shadow-hover);border-color:var(--dna-chart-soft)}
+.dna-canvas .tkb-task.is-over{border-left:4px solid var(--dna-late)}
+.dna-canvas .tkb-task-head{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.dna-canvas .tkb-task-title{flex:1 1 auto;min-width:0;font-size:var(--dna-fs-small);font-weight:600;color:var(--dna-ink);line-height:1.5}
+.dna-canvas button.tkb-task-tgl{
+  appearance:none;border:0;background:none;padding:3px;margin:-2px -4px 0 0;color:var(--dna-ink-faint);cursor:pointer;border-radius:6px;flex:0 0 auto;
+  display:inline-grid;place-items:center;transition:background var(--dna-motion-fast) ease,color var(--dna-motion-fast) ease;
+}
+.dna-canvas button.tkb-task-tgl svg{width:12px;height:12px;stroke:currentColor;fill:none;transition:transform var(--dna-motion-base) var(--dna-ease-inout)}
+.dna-canvas .tkb-task.is-open .tkb-task-tgl svg{transform:rotate(180deg)}
+.dna-canvas button.tkb-task-tgl:hover{color:var(--dna-ink-2);background:var(--dna-surface-2)}
+.dna-canvas .tkb-task-meta{display:flex;align-items:center;gap:7px;min-width:0}
+.dna-canvas .tkb-task-meta small{font-size:11.5px;font-weight:500;color:var(--dna-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dna-canvas .tkb-task-meta .dna-due{margin-left:auto;flex:none;font-size:11.5px}
+.dna-canvas .tkb-task[tabindex] .tkb-task-more{
+  display:grid;grid-template-rows:0fr;opacity:0;margin-top:0;padding-top:0;border-top:1px solid transparent;
+  transition:grid-template-rows var(--dna-motion-slow) var(--dna-ease-out),opacity var(--dna-motion-base) ease,margin-top var(--dna-motion-base) ease,padding-top var(--dna-motion-base) ease,border-top-color var(--dna-motion-base) ease;
+}
+.dna-canvas .tkb-task[tabindex]:hover .tkb-task-more,
+.dna-canvas .tkb-task[tabindex]:focus-visible .tkb-task-more,
+.dna-canvas .tkb-task[tabindex].is-open .tkb-task-more{grid-template-rows:1fr;opacity:1;margin-top:2px;padding-top:8px;border-top-color:var(--dna-hairline)}
+.dna-canvas .tkb-task-more .in{overflow:hidden;min-height:0;min-width:0;display:grid;gap:8px}
+.dna-canvas .tkb-sub{background:var(--dna-surface-2);border-radius:8px;padding:8px 10px;display:grid;gap:6px;min-width:0}
+.dna-canvas .tkb-sub .h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;color:var(--dna-ink-2)}
+.dna-canvas .tkb-sub .it{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.dna-canvas .tkb-sub .it i{width:10px;height:10px;border-radius:50%;flex:none;margin-top:4px;border:1.5px dashed var(--dna-ink-faint);background:var(--dna-surface)}
+.dna-canvas .tkb-sub .it span{min-width:0;font-size:11.5px;font-weight:500;color:var(--dna-ink-2);line-height:1.6}
+.dna-canvas .tkb-src{margin:0;font-size:11.5px;font-weight:500;color:var(--dna-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dna-canvas .tkb-col-empty{border:1px dashed var(--dna-border-strong);border-radius:10px;padding:18px 10px;text-align:center;font-size:11.5px;font-weight:500;color:var(--dna-ink-faint)}
+.dna-canvas .tkb-task.is-me{border-color:transparent;background:linear-gradient(var(--dna-surface),var(--dna-surface)) padding-box,var(--dna-grad-ring) border-box}
+.dna-canvas .tkb-task.is-me.is-over{border-left-color:var(--dna-late)}
+/* チャートの声（§6 .dna-linechart の軸・グリッド） */
+.dna-canvas .axis{font-size:11.5px;font-weight:500;fill:var(--dna-ink-3);font-family:var(--dna-font)}
+.dna-canvas .grid{stroke:var(--tp-grid);stroke-width:1}
+.dna-canvas .tp-empty{margin:18px 0 0;font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink-3);text-align:center;padding:26px 0}
+
+/* ============================================================
+   5. page-local（数量の担体）
+   ============================================================ */
+/* 計器盤の骨格 */
+.tp-grid-2{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--dna-gap);margin-top:var(--dna-gap);align-items:stretch}
+.tp-grid-eq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dna-gap);margin-top:var(--dna-gap);align-items:stretch}
+.tp-grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--dna-gap);margin-top:var(--dna-gap)}
+.tp-card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.tp-card-head .right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tp-gloss{margin:2px 0 0;font-size:var(--dna-fs-small);font-weight:400;color:var(--dna-ink-3);line-height:1.5}
+.tp-card-title{margin:6px 0 0;font-size:var(--dna-fs-subject);font-weight:600;color:var(--dna-ink);line-height:1.4}
+.tp-note{margin:10px 0 0;font-size:var(--dna-fs-small);font-weight:500;color:var(--dna-ink-3);line-height:1.6}
+.tp-note b{font-weight:600;color:var(--dna-ink-2)}
+.tp-link{font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-link);text-decoration:none;white-space:nowrap}
+.tp-link:hover{text-decoration:underline}
+
+/* 健全性 5観点の信号列 */
+.tp-signals-card{padding:12px 18px;margin-top:14px}
+.tp-signals-wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.tp-signals-wrap .dna-metric-label{flex:none}
+.tp-signals{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 520px;min-width:0}
+.tp-signal{
+  flex:1 1 120px;min-width:0;display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid transparent;border-radius:10px;
+  background:transparent;font:inherit;color:var(--dna-ink);cursor:pointer;text-align:left;transition:background .15s ease;
+}
+.tp-signal:hover{background:var(--dna-surface-2)}
+.tp-signal[aria-expanded="true"]{background:var(--dna-surface-2);border-color:var(--dna-border)}
+.tp-signal .dot{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 4px transparent}
+.tp-signal.is-ok .dot{background:var(--dna-up);box-shadow:0 0 0 4px var(--dna-pill-up-bg)}
+.tp-signal.is-warn .dot{background:var(--dna-pill-warn-ink);box-shadow:0 0 0 4px var(--dna-pill-warn-bg)}
+.tp-signal.is-stop .dot{background:var(--dna-down);box-shadow:0 0 0 4px var(--dna-pill-down-bg)}
+.tp-signal .t{display:grid;min-width:0;line-height:1.25}
+.tp-signal .t b{font-size:var(--dna-fs-sub);font-weight:600;white-space:nowrap}
+.tp-signal .t small{font-size:11.5px;font-weight:600;letter-spacing:.02em}
+.tp-signal.is-ok .t small{color:var(--dna-pill-up-ink)}
+.tp-signal.is-warn .t small{color:var(--dna-pill-warn-ink)}
+.tp-signal.is-stop .t small{color:var(--dna-pill-down-ink)}
+.tp-sig-why{margin:8px 0 0;padding:10px 12px;border-radius:10px;background:var(--dna-surface-2);font-size:var(--dna-fs-sub);font-weight:400;color:var(--dna-ink-2);line-height:1.6}
+.tp-sig-why b{font-weight:600;color:var(--dna-ink)}
+
+/* KGI 環ゲージ */
+.tp-kgi{display:flex;flex-direction:column}
+.tp-kgi-body{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;margin-top:6px}
+.tp-gauge{width:300px;max-width:100%;height:auto;display:block;flex:0 1 300px}
+.tp-gauge .track{fill:none;stroke:var(--dna-progress-track);stroke-width:18;stroke-linecap:round}
+.tp-gauge .ghost{fill:none;stroke:var(--dna-chart-soft);stroke-width:18;stroke-linecap:round;stroke-dasharray:1 8;opacity:.9}
+.tp-gauge .fill{fill:none;stroke:url(#tp-grad);stroke-width:18;stroke-linecap:round}
+.tp-gauge .tick{stroke:var(--dna-ink);stroke-width:2.5;stroke-linecap:round}
+.tp-stop-a{stop-color:var(--dna-grad-a)}
+.tp-stop-b{stop-color:var(--dna-grad-b)}
+.tp-gauge .hero{font-size:40px;font-weight:650;letter-spacing:-.6px;fill:var(--dna-ink);font-family:var(--dna-font)}
+.tp-gauge .hero-sub{font-size:15px;font-weight:600;fill:var(--dna-ink-2);font-family:var(--dna-font)}
+.tp-gauge .hero-top{font-size:12.5px;font-weight:600;fill:var(--dna-ink-3);font-family:var(--dna-font)}
+.tp-gauge .lbl{font-size:11.5px;font-weight:600;fill:var(--dna-ink-3);font-family:var(--dna-font)}
+.tp-gauge .lbl.strong{fill:var(--dna-ink);font-weight:600}
+.tp-legend{flex:1 1 220px;min-width:0;display:grid;gap:2px;align-content:center}
+.tp-legend .row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:32px;padding:2px 0;border-bottom:1px solid var(--dna-hairline)}
+.tp-legend .row:last-child{border-bottom:0}
+.tp-legend .sw{width:14px;height:14px;border-radius:4px;justify-self:center}
+.tp-legend .sw.grad{background:var(--dna-grad-h)}
+.tp-legend .sw.tick{width:3px;height:16px;border-radius:2px;background:var(--dna-ink)}
+.tp-legend .sw.ghost{background:repeating-linear-gradient(90deg,var(--dna-chart-soft) 0 3px,transparent 3px 6px);height:8px;border-radius:4px}
+.tp-legend .sw.goal{background:transparent;border:2px solid var(--dna-ink-faint);border-radius:50%;width:12px;height:12px}
+.tp-legend .k{font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink-2);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-legend .k small{display:block;font-size:11.5px;font-weight:500;color:var(--dna-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-legend .v{font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);white-space:nowrap;display:inline-flex;align-items:baseline;gap:6px;font-feature-settings:"tnum"}
+.tp-legend .v .u{font-size:12.5px;font-weight:600;color:var(--dna-ink-2)}
+.tp-bn{margin-top:10px;padding-top:10px;border-top:1px solid var(--dna-hairline);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink-2)}
+.tp-bn .n{font-weight:600;color:var(--dna-ink)}
+.tp-bn .pace{display:inline-flex;align-items:baseline;gap:4px;font-feature-settings:"tnum"}
+.tp-bn .pace b{font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink)}
+.tp-bn .pace.need b{color:var(--dna-pill-info-ink)}
+.tp-bn .arrow{color:var(--dna-ink-faint)}
+
+/* 決めどころ（着地比較の棒） */
+.tp-decide{display:grid;gap:4px;margin-top:8px}
+.tp-decide-row{display:grid;grid-template-columns:26px minmax(0,1fr);gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--dna-hairline)}
+.tp-decide-row:last-child{border-bottom:0}
+.tp-decide-row .no{width:24px;height:24px;border-radius:50%;background:var(--dna-pill-info-bg);color:var(--dna-pill-info-ink);font-size:12.5px;font-weight:600;display:grid;place-items:center;margin-top:1px}
+.tp-decide-row .t{min-width:0}
+.tp-decide-row .t b{display:block;font-size:var(--dna-fs-body);font-weight:600;color:var(--dna-ink);line-height:1.45}
+.tp-decide-row .t .who{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.tp-land{grid-column:2;display:grid;grid-template-columns:auto minmax(60px,1fr) auto;align-items:center;gap:10px;margin-top:6px}
+.tp-land .lbl{font-size:11.5px;font-weight:600;color:var(--dna-ink-3);white-space:nowrap}
+.tp-land u{text-decoration:none;display:block;height:8px;border-radius:4px;background:var(--dna-progress-track);overflow:hidden;position:relative}
+.tp-land u i{display:block;height:100%;border-radius:4px;background:var(--dna-grad-h)}
+.tp-land u.base i{background:var(--dna-ink-faint)}
+.tp-land b{font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);white-space:nowrap;font-feature-settings:"tnum"}
+.tp-land b small{font-size:12.5px;font-weight:600;color:var(--dna-ink-2);margin-left:2px}
+.tp-land.base{grid-column:1 / -1;grid-template-columns:auto minmax(60px,1fr) auto;margin-top:2px;padding-top:8px}
+.tp-land.base .lbl{color:var(--dna-ink-2)}
+.tp-land .goalmark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--dna-ink-2);right:0}
+
+/* KPI ミニ推移（目標線つき） */
+.tp-kpi{display:flex;flex-direction:column}
+.tp-kpi-head{display:flex;align-items:center;gap:8px;min-width:0}
+.tp-kpi-head .dna-metric-label{min-width:0}
+.tp-kpi-head .dna-metric-label .u{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-kpi-head .dna-tag{margin-left:auto;flex:none;font-size:11.5px;padding:2.5px 8px}
+.tp-kpi .tp-gloss{white-space:normal;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.2em}
+.tp-mini{width:92px;height:46px;flex:none;display:block}
+.tp-mini .bar{fill:var(--tp-minibar)}
+.tp-mini .bar.hot{fill:var(--dna-chart-soft)}
+.tp-mini .goal{stroke:var(--dna-chart);stroke-width:1.5;stroke-dasharray:2 3}
+.tp-mini .goal-t{font-size:11px;font-weight:600;fill:var(--dna-chart);font-family:var(--dna-font)}
+.tp-kpi-foot{margin:8px 0 0;font-size:var(--dna-fs-small);font-weight:500;color:var(--dna-ink-3);line-height:1.6;display:flex;flex-wrap:wrap;gap:0 6px}
+.tp-kpi-foot b{font-weight:600;color:var(--dna-ink-2)}
+.tp-kpi-foot .asof{margin-left:auto;white-space:nowrap}
+
+/* フェーズの帯（今日線） */
+.tp-band-wrap{margin-top:34px;position:relative}
+.tp-band{position:relative;height:40px;border-radius:999px;background:var(--dna-progress-track)}
+.tp-phase{
+  position:absolute;top:0;bottom:0;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:0;
+  font-size:12.5px;font-weight:600;color:var(--dna-ink-2);white-space:nowrap;overflow:hidden;
+}
+.tp-phase .no{flex:none;width:18px;height:18px;border-radius:50%;background:var(--dna-surface);color:var(--dna-ink-2);display:grid;place-items:center;font-size:11px;font-weight:600;box-shadow:0 1px 2px rgba(16,18,26,.12)}
+.tp-phase .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tp-phase.is-past{background:var(--dna-chart-band);color:var(--dna-ink-2)}
+.tp-phase.is-now{background:var(--dna-grad-h);color:#fff}
+.tp-phase.is-now .no{color:var(--dna-grad-a)}
+.tp-phase.is-next{background:transparent;box-shadow:inset 0 0 0 1px var(--dna-border-strong)}
+.tp-phase:first-child{border-radius:999px 0 0 999px}
+.tp-phase.is-last{border-radius:0 999px 999px 0}
+.tp-today{position:absolute;top:-8px;bottom:-14px;width:2px;background:var(--dna-chart);transform:translateX(-1px);z-index:2}
+.tp-today-tag{
+  position:absolute;top:-30px;transform:translateX(-50%);font-size:11.5px;font-weight:650;padding:3px 10px;border-radius:999px;
+  background:var(--dna-pill-info-bg);color:var(--dna-pill-info-ink);white-space:nowrap;z-index:3;line-height:1.3;
+}
+.tp-gate{position:absolute;top:100%;margin-top:8px;transform:translateX(-50%);display:grid;justify-items:center;gap:3px;z-index:1}
+.tp-gate i{width:12px;height:12px;border-radius:50%;background:var(--dna-surface);border:2px solid var(--dna-ink-faint);display:grid;place-items:center}
+.tp-gate.is-done i{background:var(--dna-up);border-color:var(--dna-up)}
+.tp-gate i svg{width:8px;height:8px;stroke:#fff;fill:none}
+.tp-gate small{font-size:11.5px;font-weight:500;color:var(--dna-ink-3);white-space:nowrap;font-feature-settings:"tnum"}
+.tp-gate.is-done small{color:var(--dna-pill-up-ink);font-weight:600}
+.tp-phaselist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:44px}
+.tp-phaselist .ph{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;min-width:0;font-size:12.5px;line-height:1.45}
+.tp-phaselist .ph .no{grid-row:1 / span 3;width:20px;height:20px;border-radius:50%;background:var(--dna-surface-2);border:1px solid var(--dna-border);color:var(--dna-ink-2);display:grid;place-items:center;font-size:11px;font-weight:600;margin-top:1px}
+.tp-phaselist .ph.is-now .no{background:var(--dna-pill-info-bg);border-color:transparent;color:var(--dna-pill-info-ink)}
+.tp-phaselist .ph .nm{font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink);min-width:0}
+.tp-phaselist .ph .dt{font-weight:500;color:var(--dna-ink-3);font-feature-settings:"tnum"}
+.tp-phaselist .ph .gt{font-weight:400;color:var(--dna-ink-2);min-width:0;display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}
+.tp-phaselist .ph .gt .dna-status{font-size:11px;padding:2.5px 8px;flex:none}
+
+/* 積み上げの帯（タスク・WP・稼働） */
+.tp-stack{display:flex;height:14px;border-radius:999px;background:var(--dna-progress-track);overflow:hidden;position:relative}
+.tp-stack i{display:block;height:100%}
+.tp-stack .s-todo{background:var(--dna-control-off)}
+.tp-stack .s-doing{background:var(--dna-chart)}
+.tp-stack .s-review{background:var(--dna-chart-soft)}
+.tp-stack .s-blocked{background:var(--dna-down)}
+.tp-stack .s-done{background:var(--dna-grad-h)}
+.tp-stack .plan{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--dna-ink-2)}
+.tp-stack-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;font-weight:500;color:var(--dna-ink-2)}
+.tp-stack-legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tp-stack-legend i{width:8px;height:8px;border-radius:50%;flex:none}
+.tp-stack-legend b{font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-stack-legend .late{color:var(--dna-late)}
+.tp-stack-legend .late b{color:var(--dna-late)}
+.tp-stack-legend .late i{background:var(--dna-late)}
+.tp-stackrow{margin-top:14px}
+.tp-stackrow .h{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink-2)}
+.tp-stackrow .h b{font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-stackrow .h small{font-size:12.5px;font-weight:500;color:var(--dna-ink-3);margin-left:auto;white-space:nowrap}
+.tp-rate{display:flex;align-items:center;gap:10px;margin-top:6px}
+.tp-rate u{text-decoration:none;display:block;flex:1 1 auto;height:8px;border-radius:4px;background:var(--dna-progress-track);overflow:hidden}
+.tp-rate u i{display:block;height:100%;border-radius:4px;background:var(--dna-grad-h)}
+.tp-rate b{flex:none;font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-rate small{flex:none;font-size:12.5px;font-weight:500;color:var(--dna-ink-3);white-space:nowrap}
+
+/* リスク・課題 */
+.tp-ri{display:grid;margin-top:6px}
+.tp-ri-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--dna-hairline);align-items:start}
+.tp-ri-row:last-child{border-bottom:0}
+.tp-ri-row .st{display:grid;gap:4px;justify-items:start}
+.tp-ri-row .st small{font-size:11.5px;font-weight:600;color:var(--dna-ink-3);letter-spacing:.02em;padding-left:2px}
+.tp-ri-row .tx{font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink);line-height:1.55;min-width:0}
+.tp-ri-row .meta{grid-column:2;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.tp-ri-row .meta b{font-weight:600;color:var(--dna-ink-2)}
+.dna-canvas .tp-col2{grid-column:2}
+.dna-canvas .tp-mt0{margin-top:0}
+.tp-ri-row .meta .dna-due{font-size:12.5px}
+
+/* この人の今週（見る人の帯） */
+.tp-mpanel{margin-top:14px;padding:16px 22px}
+.tp-mpanel .ph{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tp-mpanel .ph .t{min-width:0}
+.tp-mpanel .ph .n{display:block;font-size:var(--dna-fs-subject);font-weight:600;color:var(--dna-ink)}
+.tp-mpanel .ph .r{display:block;font-size:12.5px;font-weight:400;color:var(--dna-ink-3)}
+.tp-mpanel .ph .right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tp-mpanel-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 22px;margin-top:12px;padding-top:12px;border-top:1px solid var(--dna-hairline)}
+.tp-blk{min-width:0}
+.tp-blk .k{display:block;font-size:11.5px;font-weight:600;color:var(--dna-ink-3);letter-spacing:.04em;margin-bottom:6px}
+.tp-blk .big{display:inline-flex;align-items:baseline;gap:4px;font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-blk .big small{font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.tp-blk .big .late{font-size:12.5px;font-weight:600;color:var(--dna-late);margin-left:6px}
+.tp-blk .tags{display:flex;flex-wrap:wrap;gap:5px}
+.tp-blk .tags .dna-tag{font-size:11.5px;padding:2.5px 8px}
+.tp-blk .tags .more{font-size:11.5px;font-weight:500;color:var(--dna-ink-3);align-self:center}
+.tp-kdi{display:grid;gap:5px}
+.tp-kdi .r{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;align-items:center;gap:8px;font-size:12.5px}
+.tp-kdi .r .nm{font-weight:500;color:var(--dna-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tp-kdi .r u{text-decoration:none;display:block;height:6px;border-radius:3px;background:var(--dna-progress-track);overflow:hidden}
+.tp-kdi .r u i{display:block;height:100%;border-radius:3px;background:var(--dna-grad-h)}
+.tp-kdi .r u i.short{background:var(--dna-pill-warn-ink)}
+.tp-kdi .r b{font-weight:600;color:var(--dna-ink);white-space:nowrap;font-feature-settings:"tnum"}
+.tp-kdi .r b small{font-weight:500;color:var(--dna-ink-3)}
+.tp-mini-list{display:grid;gap:4px;font-size:12.5px}
+.tp-mini-list .r{display:flex;align-items:center;gap:8px;min-width:0}
+.tp-mini-list .r .tx{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dna-ink);font-weight:500}
+.tp-mini-list .r .dna-status{font-size:11px;padding:2.5px 8px;flex:none;margin-left:auto}
+.tp-mini-list .r .dna-due{font-size:12.5px;flex:none}
+
+/* メンバーの人カード */
+.tp-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dna-gap);margin-top:12px}
+.tp-person{position:relative}
+.tp-person.is-me{border-color:transparent;background:linear-gradient(var(--dna-surface),var(--dna-surface)) padding-box,var(--dna-grad-ring) border-box}
+.tp-person .ph{display:flex;align-items:center;gap:12px;min-width:0}
+.tp-person .ph .t{min-width:0;flex:1 1 auto}
+.tp-person .ph .n{display:block;font-size:var(--dna-fs-subject);font-weight:600;color:var(--dna-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-person .ph .r{display:block;margin-top:1px;font-size:13.5px;font-weight:400;color:var(--dna-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-person .ph .right{flex:none;display:inline-flex;gap:6px;align-items:center}
+.tp-person-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 22px;margin-top:14px;padding-top:12px;border-top:1px solid var(--dna-hairline)}
+.tp-person-grid .wide{grid-column:1 / -1}
+.tp-load{width:100%;height:56px;display:block}
+.tp-load .bar{fill:var(--tp-minibar)}
+.tp-load .bar.hot{fill:url(#tp-grad-v)}
+.tp-load .lb{font-size:11px;font-weight:500;fill:var(--dna-ink-3);font-family:var(--dna-font)}
+.tp-load .lb.hot{fill:var(--dna-ink);font-weight:600}
+.tp-load .pc{font-size:11px;font-weight:600;fill:var(--dna-ink-2);font-family:var(--dna-font)}
+.tp-next{display:flex;align-items:center;gap:10px;min-width:0;font-size:var(--dna-fs-sub)}
+.tp-next .dna-due{flex:none;font-size:13.5px;font-weight:600}
+.tp-next .tx{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dna-ink-2);font-weight:500}
+.tp-members-sum{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:var(--dna-fs-sub);font-weight:500;color:var(--dna-ink-2)}
+.tp-members-sum b{font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-members-sum .late{color:var(--dna-late)}
+
+/* 会議の流れ（前回 → 今週 → 次回） */
+.tp-flow{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr) 22px minmax(0,1fr);gap:8px;align-items:stretch;margin-top:12px}
+.tp-flow-arrow{display:grid;place-items:center;color:var(--dna-ink-faint)}
+.tp-flow-arrow svg{width:18px;height:18px;stroke:currentColor;fill:none}
+.tp-mtg{display:flex;flex-direction:column;gap:12px;padding:18px 20px 20px}
+.tp-mtg-head{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.tp-mtg-head .stage{font-size:11.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--dna-ink-3);line-height:1;padding-top:3px;flex:none}
+.tp-mtg-head .stage.now{color:var(--dna-pill-info-ink)}
+.tp-mtg-head .d{min-width:0}
+.tp-mtg-head .d b{display:block;font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);line-height:1.35}
+.tp-mtg-head .d small{display:block;margin-top:2px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.tp-mtg .sec{padding-top:10px;border-top:1px solid var(--dna-hairline)}
+.tp-mtg .sec .h{display:flex;align-items:baseline;gap:8px;font-size:var(--dna-fs-sub);font-weight:600;color:var(--dna-ink-2);margin-bottom:6px}
+.tp-mtg .sec .h b{font-size:var(--dna-fs-section);font-weight:600;color:var(--dna-ink);font-feature-settings:"tnum"}
+.tp-mtg .sec .h small{margin-left:auto;font-size:12.5px;font-weight:500;color:var(--dna-ink-3);white-space:nowrap}
+.tp-check{display:grid;gap:2px}
+.tp-check .r{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:start;gap:8px;min-height:32px;padding:4px 4px;border-radius:8px}
+.tp-check .r .ck{margin-top:2px}
+.tp-check .r .right{padding-top:1px}
+.tp-check .r.is-me{background:var(--dna-pill-info-bg)}
+.tp-check .r .ck{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;background:var(--dna-surface);border:1.5px solid var(--dna-ink-faint)}
+.tp-check .r .ck.on{background:var(--dna-up);border-color:var(--dna-up)}
+.tp-check .r .ck svg{width:10px;height:10px;stroke:#fff;fill:none}
+.tp-check .r .tx{min-width:0;font-size:13.5px;font-weight:500;color:var(--dna-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-check .r .tx small{display:block;font-size:11.5px;font-weight:500;color:var(--dna-ink-3);white-space:normal;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tp-check .r .right{display:inline-flex;align-items:center;gap:8px;flex:none}
+.tp-check .r .dna-status{font-size:11px;padding:2.5px 8px}
+.tp-check .r .dna-due{font-size:12.5px}
+.tp-pills{display:flex;flex-wrap:wrap;gap:6px}
+.tp-pills .dna-tag{white-space:normal;text-align:left;line-height:1.5;max-width:100%}
+.dna-canvas .dna-tag.tp-wp{display:inline-flex;align-items:baseline;gap:5px;max-width:260px}
+.dna-canvas .dna-tag.tp-wp b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dna-canvas .dna-tag.tp-wp small{font-size:10.5px;font-weight:700;opacity:.72;flex:none}
+.dna-canvas .dna-tag.tp-wp i.st{font-style:normal;font-size:10.5px;font-weight:600;opacity:.66;flex:none}
+.tp-before{display:grid;gap:6px}
+.tp-before .r{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:baseline;font-size:13.5px;font-weight:500;color:var(--dna-ink-2);line-height:1.5}
+.tp-before .r .w{font-size:11.5px;font-weight:700;color:var(--dna-pill-info-ink);background:var(--dna-pill-info-bg);border-radius:6px;padding:2px 8px;white-space:nowrap}
+.tp-agenda{display:grid;gap:2px;counter-reset:ag}
+.tp-agenda .r{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:start;gap:8px;padding:5px 4px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--dna-ink);line-height:1.5}
+.tp-agenda .r .no{width:20px;height:20px;border-radius:50%;background:var(--dna-surface-2);border:1px solid var(--dna-border);color:var(--dna-ink-2);display:grid;place-items:center;font-size:11px;font-weight:600;margin-top:1px}
+.tp-agenda .r.is-decide{background:var(--dna-pill-info-bg)}
+.tp-agenda .r.is-decide .no{background:var(--dna-surface);border-color:transparent;color:var(--dna-pill-info-ink)}
+.tp-agenda .r .dna-tag{font-size:11px;padding:2.5px 8px;margin-top:1px}
+.tp-faces{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.tp-faces .tp-who{font-size:12.5px;padding:2px 8px 2px 3px;border-radius:999px}
+.tp-faces .tp-who.is-me{background:var(--dna-pill-info-bg)}
+.tp-mtg-meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;font-weight:500;color:var(--dna-ink-3)}
+.tp-mtg-meta b{font-weight:600;color:var(--dna-ink-2)}
+.tp-dec{display:grid;gap:2px}
+.tp-dec .r{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--dna-hairline);align-items:start}
+.tp-dec .r:last-child{border-bottom:0}
+.tp-dec .r .dt{font-size:12.5px;font-weight:600;color:var(--dna-ink-3);font-feature-settings:"tnum";white-space:nowrap;padding-top:2px}
+.tp-dec .r .tx{font-size:var(--dna-fs-body);font-weight:600;color:var(--dna-ink);line-height:1.5;min-width:0}
+.tp-dec .r .id{font-size:11.5px;font-weight:600;color:var(--dna-ink-3);letter-spacing:.02em;margin-left:8px}
+.tp-dec .r .tp-fold{grid-column:2;margin-top:0}
+
+/* ============================================================
+   6. レスポンシブ（横はみ出しゼロ）
+   ============================================================ */
+@media (max-width:1100px){
+  .tp-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tp-mpanel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:900px){
+  .tp-grid-2,.tp-grid-eq{grid-template-columns:minmax(0,1fr)}
+  .tp-people{grid-template-columns:minmax(0,1fr)}
+  .tp-flow{grid-template-columns:minmax(0,1fr)}
+  .tp-flow-arrow svg{transform:rotate(90deg)}
+  .tp-phaselist{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :root{--tkb-lane-width:248px}
+}
+@media (max-width:600px){
+  .dna-canvas{padding:14px 14px 60px}
+  .tp-grid-4{grid-template-columns:minmax(0,1fr)}
+  .tp-mpanel-grid,.tp-person-grid,.tp-phaselist{grid-template-columns:minmax(0,1fr)}
+  .tp-gauge{flex-basis:100%;width:100%}
+  .tp-phase .nm{display:none}
+  .tp-phase{padding:0 6px}
+  .tp-scope{margin-left:0;width:100%}
+  .tp-select{max-width:100%;flex:1 1 auto}
+  .tp-signal{flex-basis:calc(50% - 6px)}
+  .tp-kpi-foot .asof{margin-left:0;width:100%}
+  .tp-ri-row{grid-template-columns:minmax(0,1fr)}
+  .tp-ri-row > *,.tp-ri-row .meta{grid-column:1}
+  .dna-canvas .tp-col2{grid-column:1}
+  .tp-ri-row .st{grid-auto-flow:column;align-items:center}
+  .tp-agenda .r{grid-template-columns:22px minmax(0,1fr)}
+  .tp-agenda .r .dna-tag{grid-column:2;justify-self:start}
+  .tp-nav .tp-select,.tp-scope .tp-select,.tp-tb-select .tp-select,.dna-canvas .dna-tb-chip,.dna-canvas .dna-tb-view{min-height:44px}
+  .dna-canvas .dna-metric-label{flex-wrap:wrap}
+  .dna-canvas .dna-metric-label .u{white-space:normal}
+  .dna-canvas .dna-tag.tp-wp{max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="dna-canvas">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+    <linearGradient id="tp-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" class="tp-stop-a" stop-color="#2f7bf2"/><stop offset="1" class="tp-stop-b" stop-color="#35c3e8"/></linearGradient>
+    <linearGradient id="tp-grad-v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="tp-stop-b" stop-color="#35c3e8"/><stop offset="1" class="tp-stop-a" stop-color="#2f7bf2"/></linearGradient>
+  </defs></svg>
+  <div class="tp-errband" data-errband hidden role="alert">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 8v5M12 16.5v.5M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3.1L13.7 3.9a2 2 0 0 0-3.4 0Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>この画面のデータ層が読めませんでした。数字は表示していません。支援側へ連絡してください。</span>
+  </div>
+
+  <header class="tp-head">
+    <div class="tp-head-l">
+      <h1 class="tp-title"><span data-project-name>運転席</span><span class="dna-status info" data-project-status hidden></span></h1>
+      <p class="tp-sub" data-project-sub></p>
+    </div>
+    <div class="tp-head-r">
+      <button type="button" class="dna-btn" data-theme-toggle aria-pressed="false" aria-label="ダークに切り替え">
+        <svg viewBox="0 0 24 24" aria-hidden="true" data-theme-icon><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" stroke-width="1.7" stroke-linejoin="round"/></svg><span data-theme-label>ダーク</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tp-nav" aria-label="画面の切り替え">
+    <div class="dna-tb-views">
+      <a class="dna-tb-view" href="#dashboard" data-view-link="dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 1 1 16 0" stroke-width="1.8" stroke-linecap="round"/><path d="m12 13 4-4" stroke-width="1.8" stroke-linecap="round"/><path d="M3 19h18" stroke-width="1.8" stroke-linecap="round"/></svg>計器盤</a>
+      <a class="dna-tb-view" href="#tasks" data-view-link="tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="5.4" height="15" rx="1.6" stroke-width="1.7"/><rect x="12" y="4.5" width="5.4" height="9" rx="1.6" stroke-width="1.7"/></svg>タスク</a>
+      <a class="dna-tb-view" href="#members" data-view-link="members"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.4" stroke-width="1.7"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke-width="1.7" stroke-linecap="round"/><path d="M15.5 11.5a3 3 0 1 0 0-6M17 14.2a5 5 0 0 1 3.5 4.8" stroke-width="1.7" stroke-linecap="round"/></svg>メンバー</a>
+      <a class="dna-tb-view" href="#meeting" data-view-link="meeting"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" stroke-width="1.7"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke-width="1.7" stroke-linecap="round"/></svg>会議</a>
+    </div>
+    <label class="tp-scope"><span>見る人</span><select class="tp-select" data-scope aria-label="見る人（全体か各メンバー）"><option value="">全体</option></select></label>
+  </nav>
+
+  <p class="tp-headline" data-headline-wrap hidden>
+    <span class="k">今週の一言</span>
+    <span class="t" data-headline></span>
+  </p>
+  <div class="tp-fold" data-headline-fold hidden></div>
+
+  <main>
+    <section data-view="dashboard" hidden aria-label="計器盤">
+      <div class="dna-card tp-mpanel" data-member-panel hidden></div>
+      <div data-dash-root></div>
+    </section>
+    <section data-view="tasks" hidden aria-label="タスク">
+      <div data-tasks-root></div>
+    </section>
+    <section data-view="members" hidden aria-label="メンバー">
+      <div data-members-root></div>
+    </section>
+    <section data-view="meeting" hidden aria-label="会議">
+      <div data-meeting-root></div>
+    </section>
+  </main>
+
+  <footer class="tp-foot" data-foot></footer>
+</div>
+
+<!--DATA_BLOCK-->
+
+<script type="application/json" id="dashboard-data">
+{
+  "meta": {
+    "schema": "talent-dashboard/v4",
+    "generated_at": "2026-09-04",
+    "generator": "tools/build_dashboard.py",
+    "source_root": "20_project/",
+    "sample": true,
+    "note": "見本データです。数値・人名はすべてサンプルで、実在の個人・組織・実績を示しません。"
+  },
+  "project": {
+    "id": "PJ-2026Q3-talent-sample",
+    "name": "人材プロジェクト（サンプル）",
+    "org": "サンプル株式会社",
+    "our_org": "支援側（サンプル）",
+    "status": "進行中",
+    "pm": "PM（サンプル）",
+    "leader": "リーダー（サンプル）",
+    "period": {
+      "start": "2026-08-17",
+      "end": "2026-11-27"
+    },
+    "updated_at": "2026-09-04"
+  },
+  "plan": {
+    "interview_window_start": "2026-08-17",
+    "interview_window_end": "2026-11-08"
+  },
+  "wps": [
+    {
+      "id": "WP-01",
+      "name": "募集要項",
+      "lead": "採用担当A（サンプル）",
+      "due": "2026-08-28",
+      "state": "完了"
+    },
+    {
+      "id": "WP-02",
+      "name": "候補者リスト",
+      "lead": "採用担当A（サンプル）",
+      "due": "2026-09-27",
+      "state": "進行中"
+    },
+    {
+      "id": "WP-03",
+      "name": "面談の運営（枠・日程・記録）",
+      "lead": "現場責任者（サンプル）",
+      "due": "2026-11-08",
+      "state": "進行中"
+    },
+    {
+      "id": "WP-04",
+      "name": "選考基準",
+      "lead": "現場責任者（サンプル）",
+      "due": "2026-08-30",
+      "state": "完了"
+    },
+    {
+      "id": "WP-05",
+      "name": "数字の運用（計器盤・週次更新・変換率の改善）",
+      "lead": "PM（サンプル）",
+      "due": "2026-11-27",
+      "state": "進行中"
+    },
+    {
+      "id": "WP-06",
+      "name": "面談記録の様式",
+      "lead": "事務担当（サンプル）",
+      "due": "2026-08-30",
+      "state": "完了"
+    },
+    {
+      "id": "WP-07",
+      "name": "受け入れ条件の通知と合意",
+      "lead": "リーダー（サンプル）",
+      "due": "2026-11-08",
+      "state": "未着手"
+    },
+    {
+      "id": "WP-08",
+      "name": "受け入れ準備（20項目）",
+      "lead": "受け入れ担当（サンプル）",
+      "due": "2026-11-06",
+      "state": "進行中"
+    },
+    {
+      "id": "WP-09",
+      "name": "配属先への引き継ぎ",
+      "lead": "現場責任者（サンプル）",
+      "due": "2026-11-20",
+      "state": "未着手"
+    },
+    {
+      "id": "WP-10",
+      "name": "立ち上げ後の定着フォロー（初月）",
+      "lead": "受け入れ担当（サンプル）",
+      "due": "2026-11-27",
+      "state": "未着手"
+    },
+    {
+      "id": "WP-11",
+      "name": "ふりかえりと教訓の記録",
+      "lead": "PM（サンプル）",
+      "due": "2026-11-27",
+      "state": "未着手"
+    },
+    {
+      "id": "WP-12",
+      "name": "完了報告と引き渡し",
+      "lead": "PM（サンプル）",
+      "due": "2026-11-27",
+      "state": "未着手"
+    }
+  ],
+  "headline": {
+    "text": "候補者は足りている。\u003cmark\u003e詰まっているのは面談の本数ひとつ\u003c/mark\u003eです。今週5人を、計画どおりの週8人へ戻せば 2026-11-27（期限）の20人に届きます。",
+    "sub": "面談 週5人 のままだと着地14人。週8人へ戻せば 20人。確定率を30%へ上げても 20人。両方なら 25人。",
+    "update_rule": "計器盤は週次会議の前に更新します。数字には必ず「いつの値か（鮮度）」を添えています。"
+  },
+  "kgi": {
+    "title": "受け入れ確定人数",
+    "gloss": "参加に合意し、受け入れ日が決まった人",
+    "unit": "人",
+    "as_is": 4,
+    "to_be": 20,
+    "deadline": "2026-11-27",
+    "as_of": "2026-09-04",
+    "history": [
+      1,
+      3,
+      4
+    ],
+    "judge": "warn",
+    "judge_label": "注意",
+    "judge_reason": "今日までの予定5人に対して4人（−1人）。原因は手前の面談で、計画24人に対し18人（−6人）。面談を計画どおり週8人へ戻せば、残り9週で72人を面談でき、確定率22%のままでも20人ちょうどに届く"
+  },
+  "kpi": [
+    {
+      "name": "候補者リスト数",
+      "gloss": "連絡先が分かり、打診できる人",
+      "agg": "累計",
+      "value": 132,
+      "unit": "人",
+      "target": 120,
+      "history": [
+        96,
+        120,
+        132
+      ],
+      "as_of": "2026-09-04 09:00",
+      "good_when": "up",
+      "note": "必要な面談90人に対しリストは132人。42人の余裕がある"
+    },
+    {
+      "name": "面談完了数",
+      "gloss": "実際に面談を終えた人",
+      "agg": "累計",
+      "value": 18,
+      "unit": "人",
+      "target": 90,
+      "history": [
+        5,
+        13,
+        18
+      ],
+      "as_of": "2026-09-04 09:00",
+      "good_when": "up",
+      "note": "目標90人は 20人 × 4.5（確定1人に面談4.5人）。今日までの計画24人に対し −6人 ― ここが律速",
+      "pace_weekly": 8,
+      "bottleneck": true
+    },
+    {
+      "name": "面談→確定率",
+      "gloss": "面談した人のうち、受け入れが決まった割合",
+      "agg": "現在",
+      "value": 22,
+      "unit": "%",
+      "target": 30,
+      "history": [
+        20,
+        23,
+        22
+      ],
+      "as_of": "2026-09-04 09:00",
+      "good_when": "up",
+      "note": "面談9人で2人。目標は10人で3人"
+    },
+    {
+      "name": "受け入れ準備の完了率",
+      "gloss": "受け入れ20項目のうち終わった割合（1項目＝5pt）",
+      "agg": "現在",
+      "value": 40,
+      "unit": "%",
+      "target": 100,
+      "history": [
+        15,
+        25,
+        40
+      ],
+      "as_of": "2026-09-03 17:00",
+      "good_when": "up",
+      "note": "時間の進み20%に対し40%で先行（DEC-20260828-01 の効果）"
+    }
+  ],
+  "kdi": [
+    {
+      "name": "面談の案内連絡",
+      "gloss": "候補者へ日程を打診したやりとりの数（1人あたり約3回＝今週10人へ打診）",
+      "actual": 30,
+      "target": 25,
+      "unit": "件",
+      "owner": "採用担当A（サンプル）"
+    },
+    {
+      "name": "面談の実施",
+      "gloss": "実際に面談を行った人数",
+      "actual": 5,
+      "target": 8,
+      "unit": "人",
+      "owner": "現場責任者（サンプル）"
+    },
+    {
+      "name": "確定者への連絡",
+      "gloss": "確定した4人への受け入れ初回案内",
+      "actual": 4,
+      "target": 4,
+      "unit": "件",
+      "owner": "受け入れ担当（サンプル）"
+    },
+    {
+      "name": "準備タスクの消化",
+      "gloss": "受け入れ準備20項目のうち今週予定の項目",
+      "actual": 3,
+      "target": 4,
+      "unit": "項目",
+      "owner": "受け入れ担当（サンプル）"
+    }
+  ],
+  "output": {
+    "wp_done": 3,
+    "wp_total": 12,
+    "wp_doing": 4,
+    "wp_todo": 5,
+    "wp_done_plan": 3,
+    "tasks_done_week": 7,
+    "tasks_due_week": 9,
+    "note": "7件 ÷ 9件。期限到来9件 ＝ 完了7件 ＋ 未完了2件（T-01・T-02）。04_tasks/ の「遅れ 2件」と一致します"
+  },
+  "health": [
+    {
+      "name": "スケジュール",
+      "signal": "warn",
+      "label": "注意",
+      "why": "必要ペース週8人に対し今週は5人。2026-09-07 に決めれば20人に届く。決めなければ着地14人"
+    },
+    {
+      "name": "スコープ",
+      "signal": "ok",
+      "label": "健全",
+      "why": "受け入れ20人・4フェーズ・期限（2026-11-27）は開始日（2026-08-17）から変更なし"
+    },
+    {
+      "name": "品質",
+      "signal": "ok",
+      "label": "健全",
+      "why": "面談記録の様式は全件そろい（WP-06完了）、差し戻し0件"
+    },
+    {
+      "name": "チーム",
+      "signal": "warn",
+      "label": "注意",
+      "why": "面談官は計画4名に対し2名。週8人の枠のうち埋まるのは4人ぶん（今週はリーダー（サンプル）が1人ぶん肩代わりして5人）"
+    },
+    {
+      "name": "リスク",
+      "signal": "ok",
+      "label": "健全",
+      "why": "顕在化0件・兆候あり1件・監視中2件。すべて対応先と期限が決まっている"
+    }
+  ],
+  "milestones": {
+    "today": "2026-09-04",
+    "overlap_note": "フェーズは重点期間です。前後の作業が重なることがあり、②の期間に先行して確定した人も KGI に数えます。",
+    "phases": [
+      {
+        "no": 1,
+        "name": "準備",
+        "start": "2026-08-17",
+        "end": "2026-08-30",
+        "gate": "募集要項と選考基準の確定",
+        "gate_date": "2026-08-30",
+        "gate_done": true,
+        "gate_note": "通過"
+      },
+      {
+        "no": 2,
+        "name": "候補者づくり（先行面談あり）",
+        "start": "2026-08-31",
+        "end": "2026-09-27",
+        "gate": "候補者120人と面談枠（週8人）の確保",
+        "gate_date": "2026-09-27",
+        "gate_done": false,
+        "gate_note": "未判定（候補者は 2026-08-28 に達成済・面談枠は未確保）"
+      },
+      {
+        "no": 3,
+        "name": "面談・確定",
+        "start": "2026-09-28",
+        "end": "2026-11-08",
+        "gate": "面談90人の完了と受け入れ確定20人",
+        "gate_date": "2026-11-08",
+        "gate_done": false,
+        "gate_note": "未判定"
+      },
+      {
+        "no": 4,
+        "name": "受け入れ・立ち上げ",
+        "start": "2026-11-09",
+        "end": "2026-11-27",
+        "gate": "受け入れ準備100%（20項目）と初日案内の完了",
+        "gate_date": "2026-11-27",
+        "gate_done": false,
+        "gate_note": "未判定"
+      }
+    ]
+  },
+  "decide": [
+    {
+      "no": 1,
+      "title": "面談官を2名追加して4名体制（週8人）へ戻すか",
+      "text": "面談官1名＝週2人の枠。いまは2名（週4人）で、今週はリーダー（サンプル）が1人ぶん肩代わりして5人。計画の4名＝週8人へ戻すだけで、残り9週で72人を面談できる。",
+      "owner": "リーダー（サンプル）",
+      "related": [
+        "T-01",
+        "PJ-2026Q3-talent-sample/ISS-01"
+      ],
+      "landing_lever": {
+        "pace_weekly": 8,
+        "conv_rate": null
+      }
+    },
+    {
+      "no": 2,
+      "title": "書類確認を1段ふやして確定率を30%へ上げるか（面談官は1名追加で週6人）",
+      "text": "面談の前に書類確認を1段入れ、確定率を 22% → 30% へ上げる案。面談官は1名追加（3名＝週6人）で足りる。ただし率が上がる保証はない（22%のままなら着地16人）。",
+      "owner": "リーダー（サンプル）",
+      "related": [
+        "T-02",
+        "PJ-2026Q3-talent-sample/RSK-01"
+      ],
+      "landing_lever": {
+        "pace_weekly": 6,
+        "conv_rate": 30
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-20260824-01",
+      "date": "2026-08-24",
+      "text": "面談は1人1回・60分に統一する（一次・二次の2段構成は取らない）",
+      "where": "09_meetings/MTG-talent-sample-20260824.md",
+      "why": "12週で面談90人を回す本数が要る。2段にすると同じ人数で面談回数が倍になり、面談官の枠（1名＝週2人）では 週8人 に届かない。決めた人＝リーダー（サンプル）"
+    },
+    {
+      "id": "DEC-20260828-01",
+      "date": "2026-08-28",
+      "text": "受け入れ準備は候補者づくりと並行して進め、11月に集中させない",
+      "where": "09_meetings/MTG-talent-sample-20260828.md",
+      "why": "④受け入れ・立ち上げは 2026-11-09 からの19日（約3週）しかない。20項目を11月に固めると③の面談と重なって回らない。決めた人＝現場責任者（サンプル）"
+    }
+  ],
+  "risks": [
+    {
+      "id": "PJ-2026Q3-talent-sample/RSK-01",
+      "text": "確定率が22%のまま推移すると、決めどころ2（週6人）を採った場合の着地が16人にとどまり、目標20人に4人不足する",
+      "state": "兆候あり",
+      "impact": "大",
+      "plan": "書類確認の1段追加を 2026-09-09 までに設計する（T-02）。2026-09-07 の会議で採否を決める",
+      "watcher": "リーダー（サンプル）"
+    },
+    {
+      "id": "PJ-2026Q3-talent-sample/RSK-02",
+      "text": "未面談の候補者114人（132 − 面談済18）に対し、これから必要な打診は90人（週10人 × 残り9週 ＝ 面談72人ぶん。打診10人で面談8人が成立する見本の実績）。辞退・連絡不通が2割を超えると 114人の8割＝91人となり、必要な90人を割って、面談の入口が枯れる",
+      "state": "監視中",
+      "impact": "中",
+      "plan": "紹介元3社へ追加募集を依頼（T-05・2026-09-11）",
+      "watcher": "採用担当A（サンプル）"
+    },
+    {
+      "id": "PJ-2026Q3-talent-sample/RSK-03",
+      "text": "受け入れ設備（席・端末）の納期が11月にかかり、2026-11-09 からの立ち上げに間に合わない",
+      "state": "監視中",
+      "impact": "中",
+      "plan": "見積を 2026-09-18 までに取得（T-07）。代替（レンタル・前倒し発注）を同じ表に並べる",
+      "watcher": "事務担当（サンプル）"
+    }
+  ],
+  "issues": [
+    {
+      "id": "PJ-2026Q3-talent-sample/ISS-01",
+      "text": "2026-08-31 から、面談官2名が他案件へ移り、週の面談枠が8人ぶんから4人ぶんへ落ちている（今週はリーダー（サンプル）の肩代わりで5人）",
+      "impact": "週3人の面談が積み残り、このままだと着地が14人（目標20人に6人不足）へ落ちる",
+      "owner": "現場責任者（サンプル）",
+      "due": "2026-09-07",
+      "state": "対応中"
+    }
+  ],
+  "next_meeting": {
+    "kind": "週次運転会議",
+    "date": "2026-09-07",
+    "time": "09:00〜10:00",
+    "minutes": 60,
+    "slot_label": "毎週月曜 09:00〜10:00（サンプル）",
+    "attendees": [
+      "リーダー（サンプル）",
+      "現場責任者（サンプル）",
+      "採用担当A（サンプル）",
+      "採用担当B（サンプル）",
+      "事務担当（サンプル）",
+      "受け入れ担当（サンプル）",
+      "PM（サンプル）"
+    ],
+    "agenda": [
+      "先週タスクの検収（期限到来9件・完了7件・実行率78%）",
+      "数字の確認（KGI 4/20人・面談18/90人・確定率22%・準備40%）",
+      "決めどころ1: 面談官2名を追加して4名体制（週8人）へ戻すか",
+      "決めどころ2: 書類確認を1段ふやして確定率を30%へ上げるか",
+      "遅れている2件（T-01・T-02）の期限の決め直しと解除確認",
+      "第3週の面談5人（予定8人）の振り返り",
+      "次回の議題"
+    ],
+    "decide_index": 2
+  },
+  "members": [
+    {
+      "name": "PM（サンプル）",
+      "role": "責任者（PM）・回す人",
+      "raci": {
+        "WP-01": "I",
+        "WP-02": "I",
+        "WP-03": "C",
+        "WP-04": "I",
+        "WP-05": "A",
+        "WP-06": "C",
+        "WP-07": "C",
+        "WP-08": "I",
+        "WP-09": "I",
+        "WP-10": "I",
+        "WP-11": "A",
+        "WP-12": "A"
+      },
+      "load": {
+        "8月": 30,
+        "9月": 30,
+        "10月": 30,
+        "11月": 40
+      },
+      "load_note": "計器盤の更新と会議の進行",
+      "stakeholder": {
+        "influence": "高",
+        "interest": "高",
+        "engagement": "指導",
+        "engagement_desired": "指導",
+        "next_step": "毎週の会議前に計器盤を更新（入場券）。PM（サンプル）・毎週金曜"
+      }
+    },
+    {
+      "name": "リーダー（サンプル）",
+      "role": "リーダー（サンプル株式会社）・決める人",
+      "raci": {
+        "WP-01": "C",
+        "WP-02": "C",
+        "WP-03": "C",
+        "WP-04": "C",
+        "WP-05": "I",
+        "WP-07": "A",
+        "WP-09": "C",
+        "WP-11": "C",
+        "WP-12": "C"
+      },
+      "load": {
+        "8月": 10,
+        "9月": 10,
+        "10月": 10,
+        "11月": 10
+      },
+      "load_note": "決める場だけ（週次に月1回以上・重要意思決定の場）",
+      "stakeholder": {
+        "influence": "高",
+        "interest": "高",
+        "engagement": "支援型",
+        "engagement_desired": "指導",
+        "next_step": "2026-09-07 の会議で決めどころ2件を決め切ってもらう（PM（サンプル）が前日に資料を渡す）"
+      }
+    },
+    {
+      "name": "現場責任者（サンプル）",
+      "role": "面談の運営（WP-03）・面談官を兼ねる",
+      "raci": {
+        "WP-01": "C",
+        "WP-02": "C",
+        "WP-03": "A",
+        "WP-04": "A",
+        "WP-05": "C",
+        "WP-06": "C",
+        "WP-07": "R",
+        "WP-08": "C",
+        "WP-09": "A",
+        "WP-10": "C",
+        "WP-11": "C",
+        "WP-12": "I"
+      },
+      "load": {
+        "8月": 40,
+        "9月": 50,
+        "10月": 60,
+        "11月": 40
+      },
+      "load_note": "面談官を兼ねる（週2人ぶん）",
+      "stakeholder": {
+        "influence": "高",
+        "interest": "高",
+        "engagement": "支援型",
+        "engagement_desired": "支援型",
+        "next_step": "面談官2名が他案件へ移った件の稟議（T-01・PJ-2026Q3-talent-sample/ISS-01）を 2026-09-07 の会議で決着させる。現場責任者（サンプル）・2026-09-07"
+      }
+    },
+    {
+      "name": "採用担当A（サンプル）",
+      "role": "候補者リストと打診（WP-01・WP-02）",
+      "raci": {
+        "WP-01": "A",
+        "WP-02": "A",
+        "WP-03": "R",
+        "WP-04": "C",
+        "WP-05": "I",
+        "WP-11": "C",
+        "WP-12": "I"
+      },
+      "load": {
+        "8月": 60,
+        "9月": 60,
+        "10月": 40,
+        "11月": 20
+      },
+      "load_note": "打診と日程調整",
+      "stakeholder": {
+        "influence": "中",
+        "interest": "高",
+        "engagement": "支援型",
+        "engagement_desired": "支援型",
+        "next_step": "追加募集の依頼状況を週次で共有（採用担当A・毎週）"
+      }
+    },
+    {
+      "name": "採用担当B（サンプル）",
+      "role": "書類確認・選考基準（WP-04）",
+      "raci": {
+        "WP-01": "R",
+        "WP-02": "R",
+        "WP-03": "R",
+        "WP-04": "R",
+        "WP-05": "I",
+        "WP-06": "R",
+        "WP-11": "C",
+        "WP-12": "I"
+      },
+      "load": {
+        "8月": 40,
+        "9月": 40,
+        "10月": 40,
+        "11月": 20
+      },
+      "load_note": "書類確認（決めどころ2を採るとここが増える）",
+      "stakeholder": {
+        "influence": "中",
+        "interest": "高",
+        "engagement": "中立",
+        "engagement_desired": "支援型",
+        "next_step": "書類確認1段追加の案（T-02）の採否を 2026-09-07 に決め、役割を確定する（リーダー（サンプル）・2026-09-07）"
+      }
+    },
+    {
+      "name": "事務担当（サンプル）",
+      "role": "面談枠のカレンダー・設備の見積（WP-03・WP-08）",
+      "raci": {
+        "WP-03": "R",
+        "WP-05": "R",
+        "WP-06": "A",
+        "WP-07": "I",
+        "WP-08": "R",
+        "WP-11": "C",
+        "WP-12": "I"
+      },
+      "load": {
+        "8月": 20,
+        "9月": 30,
+        "10月": 30,
+        "11月": 40
+      },
+      "load_note": "面談枠のカレンダー・設備の見積",
+      "stakeholder": {
+        "influence": "低",
+        "interest": "高",
+        "engagement": "支援型",
+        "engagement_desired": "支援型",
+        "next_step": "9週ぶんの面談枠カレンダー（T-03）を 2026-09-07 までに出す"
+      }
+    },
+    {
+      "name": "受け入れ担当（サンプル）",
+      "role": "受け入れ準備20項目・初日案内（WP-08）",
+      "raci": {
+        "WP-05": "I",
+        "WP-07": "R",
+        "WP-08": "A",
+        "WP-09": "R",
+        "WP-10": "A",
+        "WP-11": "C",
+        "WP-12": "I"
+      },
+      "load": {
+        "8月": 20,
+        "9月": 30,
+        "10月": 40,
+        "11月": 70
+      },
+      "load_note": "受け入れ準備20項目・初日案内",
+      "stakeholder": {
+        "influence": "中",
+        "interest": "高",
+        "engagement": "支援型",
+        "engagement_desired": "支援型",
+        "next_step": "手順書の残り12項目（T-06）を 2026-09-14 までに書き切る"
+      }
+    }
+  ],
+  "last_meeting": {
+    "id": "MTG-talent-sample-20260828",
+    "date": "2026-08-28",
+    "time": "16:00〜17:00",
+    "minutes": 60,
+    "title": "臨時（週次運転会議の場で開催・アジェンダ⓪〜⑥）",
+    "facilitator": "PM（サンプル）",
+    "attendees": [
+      "PM（サンプル）",
+      "現場責任者（サンプル）",
+      "採用担当A（サンプル）",
+      "採用担当B（サンプル）",
+      "事務担当（サンプル）",
+      "受け入れ担当（サンプル）"
+    ],
+    "review": [
+      {
+        "task": "募集要項を確定し3社へ配布",
+        "owner": "採用担当A（サンプル）",
+        "state": "完了",
+        "evidence": "（見本では省略）",
+        "note": "—"
+      },
+      {
+        "task": "選考基準の文書化と読み合わせ",
+        "owner": "現場責任者（サンプル）",
+        "state": "完了",
+        "evidence": "（見本では省略）",
+        "note": "—"
+      },
+      {
+        "task": "面談記録の様式の確定",
+        "owner": "事務担当（サンプル）",
+        "state": "完了",
+        "evidence": "（見本では省略）",
+        "note": "—"
+      }
+    ],
+    "review_done": 3,
+    "review_due": 3,
+    "actions": [
+      {
+        "text": "面談官2名の追加アサインの稟議を出す",
+        "owner": "現場責任者（サンプル）",
+        "due": "2026-09-02",
+        "dod": "稟議が提出され、可否と実施日が返る",
+        "task": "T-01"
+      },
+      {
+        "text": "書類確認を1段ふやす案をレビューに出す",
+        "owner": "採用担当B（サンプル）",
+        "due": "2026-09-03",
+        "dod": "採否の意見が両方から返る",
+        "task": "T-02"
+      },
+      {
+        "text": "9週ぶんの面談枠カレンダーを作る",
+        "owner": "事務担当（サンプル）",
+        "due": "2026-09-07",
+        "dod": "面談官ごとの担当日が入る",
+        "task": "T-03"
+      },
+      {
+        "text": "紹介元3社へ追加募集を依頼する",
+        "owner": "リーダー（サンプル）",
+        "due": "2026-09-11",
+        "dod": "3社から追加人数の返答",
+        "task": "T-05"
+      },
+      {
+        "text": "受け入れ手順書の残り12項目を書く",
+        "owner": "受け入れ担当（サンプル）",
+        "due": "2026-09-14",
+        "dod": "20項目がすべて書かれる",
+        "task": "T-06"
+      },
+      {
+        "text": "受け入れ設備（席・端末）の見積を取る",
+        "owner": "事務担当（サンプル）",
+        "due": "2026-09-18",
+        "dod": "見積と着荷予定日が書面で揃う",
+        "task": "T-07"
+      },
+      {
+        "text": "確定4人への初日案内を確定させる",
+        "owner": "受け入れ担当（サンプル）",
+        "due": "2026-09-25",
+        "dod": "文面が確定し4人へ送付",
+        "task": "T-08"
+      }
+    ],
+    "actions_total": 7,
+    "actions_tasked": 7,
+    "actions_held": 0,
+    "decisions": [
+      "DEC-20260828-01"
+    ],
+    "notes": [
+      {
+        "text": "「準備を後ろに寄せない」は毎回効きそう。受け入れ準備の完了率を KPI に足した",
+        "route": "b",
+        "detail": "決定にする → DEC-20260828-01"
+      },
+      {
+        "text": "面談官の枠が減るかもしれないという話が出た。数字にはまだ出ていない",
+        "route": "a",
+        "detail": "次回議題"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "text": "面談官2名の追加アサイン（4名体制へ戻す）の稟議を出す",
+      "wp": "WP-03 面談の運営（枠・日程・記録）",
+      "owner": "現場責任者（サンプル）",
+      "due": "2026-09-02",
+      "state": "ブロック",
+      "related": "PJ-2026Q3-talent-sample/ISS-01",
+      "dod": "稟議が提出され、決裁の可否と実施日が リーダー（サンプル）から返っている"
+    },
+    {
+      "id": "T-02",
+      "text": "書類確認を1段ふやす案をレビューに出す",
+      "wp": "WP-05 数字の運用（計器盤・週次更新・変換率の改善）",
+      "owner": "採用担当B（サンプル）",
+      "due": "2026-09-03",
+      "state": "レビュー待ち",
+      "related": "PJ-2026Q3-talent-sample/RSK-01",
+      "dod": "案が リーダー（サンプル）と現場責任者へ渡り、採否の意見が両方から返っている"
+    },
+    {
+      "id": "T-03",
+      "text": "2026-09-07〜11-08（9週）の面談枠カレンダーを作る",
+      "wp": "WP-03 面談の運営（枠・日程・記録）",
+      "owner": "事務担当（サンプル）",
+      "due": "2026-09-07",
+      "state": "進行中",
+      "related": "",
+      "dod": "9週ぶんの面談枠が日付つきで押さえられ、面談官ごとの担当日が入っている"
+    },
+    {
+      "id": "T-04",
+      "text": "今週繰り越した3人の面談日を来週前半で押さえる",
+      "wp": "WP-03 面談の運営（枠・日程・記録）",
+      "owner": "採用担当A（サンプル）",
+      "due": "2026-09-09",
+      "state": "進行中",
+      "related": "PJ-2026Q3-talent-sample/ISS-01",
+      "dod": "3人全員の面談日時が確定し、面談官の担当が決まっている"
+    },
+    {
+      "id": "T-05",
+      "text": "紹介元3社へ追加募集を依頼する",
+      "wp": "WP-02 候補者リスト",
+      "owner": "リーダー（サンプル）",
+      "due": "2026-09-11",
+      "state": "未着手",
+      "related": "PJ-2026Q3-talent-sample/RSK-02",
+      "dod": "3社すべてに依頼が届き、追加で出せる人数の返答が来ている"
+    },
+    {
+      "id": "T-06",
+      "text": "受け入れ手順書の残り12項目を書く",
+      "wp": "WP-08 受け入れ準備（20項目）",
+      "owner": "受け入れ担当（サンプル）",
+      "due": "2026-09-14",
+      "state": "進行中",
+      "related": "",
+      "dod": "20項目のうち残り12項目が書かれ、受け入れ準備の完了率が100%になる"
+    },
+    {
+      "id": "T-07",
+      "text": "受け入れ設備（席・端末）の見積を取る",
+      "wp": "WP-08 受け入れ準備（20項目）",
+      "owner": "事務担当（サンプル）",
+      "due": "2026-09-18",
+      "state": "未着手",
+      "related": "PJ-2026Q3-talent-sample/RSK-03",
+      "dod": "20人ぶんの席・端末の見積と、着荷予定日が書面で揃っている"
+    },
+    {
+      "id": "T-08",
+      "text": "確定4人への初日案内（住居・持ち物）を確定させる",
+      "wp": "WP-08 受け入れ準備（20項目）",
+      "owner": "受け入れ担当（サンプル）",
+      "due": "2026-09-25",
+      "state": "未着手",
+      "related": "",
+      "dod": "初日案内の文面が確定し、確定済みの4人に送られている"
+    }
+  ]
+}
+</script>
+<script>
+(function () {
+  "use strict";
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var doc = document, root = doc.documentElement;
+
+  /* ---------- 小さな道具 ---------- */
+  function el(tag, attrs, kids) {
+    var n = doc.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      if (attrs[k] == null || attrs[k] === false) continue;
+      if (k === "class") n.className = attrs[k];
+      else if (k === "text") n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    if (kids != null) append(n, kids);
+    return n;
+  }
+  function svg(tag, attrs, kids) {
+    var n = doc.createElementNS(SVGNS, tag);
+    if (attrs) for (var k in attrs) {
+      if (attrs[k] == null || attrs[k] === false) continue;
+      if (k === "text") n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    if (kids != null) append(n, kids);
+    return n;
+  }
+  function append(n, kids) {
+    if (!Array.isArray(kids)) kids = [kids];
+    for (var i = 0; i < kids.length; i++) {
+      var c = kids[i];
+      if (c == null || c === false) continue;
+      if (typeof c === "string" || typeof c === "number") n.appendChild(doc.createTextNode(String(c)));
+      else n.appendChild(c);
+    }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+  function pd(s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function days(a, b) { return Math.round((b - a) / 864e5); }
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  var WD = ["日", "月", "火", "水", "木", "金", "土"];
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtMD(d) { return d ? (d.getMonth() + 1) + "/" + d.getDate() : "—"; }
+  function fmtMDW(d) { return d ? fmtMD(d) + "（" + WD[d.getDay()] + "）" : "—"; }
+  function fmtYMD(d) { return d ? d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) : "—"; }
+  function shortId(id) { return String(id || "").split("/").pop(); }
+  function initial(name) {
+    var base = String(name || "").replace(/（.*?）/g, "").replace(/\(.*?\)/g, "").trim();
+    if (!base) return "?";
+    var first = base.charAt(0), last = base.charAt(base.length - 1);
+    return (base.length > 1 && /[A-Za-z0-9]/.test(last)) ? first + last : first;
+  }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
+  /* 分母0は「対象なし」。0% と書くと「やったが0件」に見えるため（数えた結果と、数える対象が無いのは別） */
+  function hasRate(b) { return typeof b === "number" && b > 0; }
+  function rateText(a, b, suffix) { return hasRate(b) ? pct(a, b) + "%" + (suffix || "") : "対象なし"; }
+  function floorSafe(x) { return Math.floor(x + 1e-9); }
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  function fmtNum(n) { return (typeof n === "number") ? n.toLocaleString("ja-JP") : String(n); }
+  function chev() { return svg("svg", { viewBox: "0 0 24 24", class: "chev", "aria-hidden": "true" }, svg("path", { d: "m9 6 6 6-6 6", "stroke-width": "1.8", "stroke-linecap": "round", "stroke-linejoin": "round" })); }
+  function chevDown() { return svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d: "m6.5 9.5 5.5 5.5 5.5-5.5", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" })); }
+  function checkIcon() { return svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d: "m5 12.5 4.5 4.5L19 7.5", "stroke-width": "3", "stroke-linecap": "round", "stroke-linejoin": "round" })); }
+  function ava(name, size) {
+    var cls = size === 40 ? "tp-ava40" : size === 22 ? "tp-ava" : "xc-ava16";
+    return el("span", { class: cls, "aria-hidden": "true", text: initial(name) });
+  }
+  /* 見本の語は静的な文字として置かない（sample=false の配布ファイルに残らないように、コードから組む） */
+  var SAMPLE_WORD = "\u898b\u672c", SAMPLE_WORD2 = "\u30b5\u30f3\u30d7\u30eb";
+  function labelPM() { return (typeof D !== "undefined" && D && D.project && D.project.pm) ? D.project.pm : "責任者"; }
+  function labeled(label, value) {
+    var v = String(value == null ? "" : value);
+    if (!v) return el("span", { text: "—" });
+    /* 値がラベルそのもので始まるときはラベルを出さない（役割語の二重表示を避ける） */
+    return v.indexOf(label) === 0 ? el("span", {}, [el("b", { text: v })]) : el("span", {}, [label + " ", el("b", { text: v })]);
+  }
+  function who(name, size) { return el("span", { class: "tp-who", title: name }, [ava(name, size || 16), el("small", { text: name })]); }
+
+  /* 状態の語彙（発明しない） */
+  var TSTATES = ["未着手", "進行中", "レビュー待ち", "ブロック"];
+  var LANE = { "未着手": "is-todo", "進行中": "is-doing", "レビュー待ち": "is-review", "ブロック": "is-blocked" };
+  var STACK = { "未着手": "s-todo", "進行中": "s-doing", "レビュー待ち": "s-review", "ブロック": "s-blocked" };
+  var PILL = { "未着手": "is-neutral", "進行中": "info", "レビュー待ち": "is-review", "ブロック": "down", "完了": "up", "中止": "is-neutral",
+               "監視中": "is-neutral", "兆候あり": "warn", "顕在化": "down", "クローズ": "is-neutral", "対応中": "warn" };
+  var SIG = { ok: { cls: "is-ok", pill: "up", label: "健全" }, warn: { cls: "is-warn", pill: "warn", label: "注意" }, stop: { cls: "is-stop", pill: "down", label: "危険" } };
+  function pill(state, cls) {
+    var c = cls || PILL[state] || "is-neutral";
+    var s = el("span", { class: "dna-status " + c });
+    if (c === "is-review") s.appendChild(el("i", { "aria-hidden": "true" }));
+    s.appendChild(doc.createTextNode(state));
+    return s;
+  }
+  function fold(label, bodyKids, opts) {
+    opts = opts || {};
+    var wrap = el("div", { class: "dna-fold tp-fold" + (opts.open ? " is-open" : "") });
+    var btn = el("button", { type: "button", class: "dna-fold-row tp-fold-row", "aria-expanded": opts.open ? "true" : "false" }, [chev(), label]);
+    var body = el("div", { class: "dna-fold-body tp-fold-body" }, el("div", { class: "inner" }, bodyKids));
+    btn.addEventListener("click", function () {
+      var open = !wrap.classList.contains("is-open");
+      wrap.classList.toggle("is-open", open);
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    append(wrap, [btn, body]);
+    return wrap;
+  }
+  function due(dstr, opts) {
+    opts = opts || {};
+    var d = pd(dstr), s = el("span", { class: "dna-due" + (opts.done ? " is-done" : "") }, fmtMD(d));
+    if (d && !opts.done && X.today && d < X.today) s.appendChild(el("i", { class: "late", text: "+" + days(d, X.today) + "日" }));
+    return s;
+  }
+  function stackBar(counts, order, total, extra) {
+    var bar = el("div", { class: "tp-stack", role: "img", "aria-label": extra && extra.label ? extra.label : "内訳" });
+    order.forEach(function (k) {
+      var n = counts[k] || 0;
+      if (n > 0 && total > 0) bar.appendChild(el("i", { class: STACK[k] || k, style: "width:" + (n / total * 100) + "%" }));
+    });
+    return bar;
+  }
+  function store(key, val) { try { if (val == null) localStorage.removeItem(key); else localStorage.setItem(key, val); } catch (e) { /* 保存できなくても動く */ } }
+  function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+  /* ---------- テーマ（明るい面が既定） ---------- */
+  var themeBtn = doc.querySelector("[data-theme-toggle]");
+  function applyTheme(t) {
+    if (t === "dark") root.setAttribute("data-color-theme", "dark"); else root.removeAttribute("data-color-theme");
+    var dark = t === "dark";
+    themeBtn.setAttribute("aria-pressed", dark ? "true" : "false");
+    themeBtn.setAttribute("aria-label", dark ? "明るい面に切り替え" : "ダークに切り替え");
+    themeBtn.querySelector("[data-theme-label]").textContent = dark ? "ライト" : "ダーク";
+  }
+  applyTheme(load("tp-theme") === "dark" ? "dark" : "light");
+  themeBtn.addEventListener("click", function () {
+    var next = root.getAttribute("data-color-theme") === "dark" ? "light" : "dark";
+    applyTheme(next); store("tp-theme", next);
+  });
+
+  /* ---------- データ層を読む（読めなければ赤い帯） ---------- */
+  var D, X = {};
+  function broken(err) {
+    doc.body.classList.add("is-broken");
+    var band = doc.querySelector("[data-errband]");
+    band.hidden = false;
+    doc.querySelector("[data-headline-wrap]").hidden = true;
+    try { if (window.console && console.error) console.error("dashboard-data unreadable:", err); } catch (e) {}
+  }
+  try {
+    var node = doc.getElementById("dashboard-data");
+    if (!node) throw new Error("no data block");
+    D = JSON.parse(node.textContent);
+    if (!D || !D.project || !D.kgi || !Array.isArray(D.tasks)) throw new Error("schema mismatch");
+  } catch (e) { broken(e); return; }
+  if (D.meta && D.meta.sample === false) document.documentElement.setAttribute("data-live", "1");
+
+  try { main(); } catch (e) { broken(e); return; }
+
+  function main() {
+    /* ---------- 派生値（表示層が計算） ---------- */
+    var P = D.project, K = D.kgi;
+    /* 基準日は必ずデータ層から取る。無い・読めないなら端末の日時で代用せず、赤帯で止める（R2） */
+    X.today = pd(P.updated_at) || pd(D.milestones && D.milestones.today);
+    if (!X.today) throw new Error("基準日（project.updated_at / milestones.today）がデータ層にありません");
+    X.pStart = pd(P.period.start); X.pEnd = pd(P.period.end);
+    X.weekNo = Math.floor(days(X.pStart, X.today) / 7) + 1;
+    X.totalWeeks = Math.ceil((days(X.pStart, X.pEnd) + 1) / 7);
+    X.monday = addDays(X.today, -((X.today.getDay() + 6) % 7));
+    X.sunday = addDays(X.monday, 6);
+    X.nextMon = addDays(X.monday, 7);
+    X.winEnd = pd(D.plan && D.plan.interview_window_end) || pd(K.deadline);
+    X.remWeeks = Math.max(0, Math.ceil(days(X.nextMon, X.winEnd) / 7));
+    X.deadline = pd(K.deadline);
+    X.remDeadlineWeeks = Math.max(0, Math.round(days(X.today, X.deadline) / 7));
+    X.bn = (D.kpi || []).filter(function (k) { return k.bottleneck; })[0] || null;
+    X.kgiDelta = (K.history && K.history.length >= 2) ? K.as_is - K.history[K.history.length - 2] : null;
+    X.curPace = (X.bn && X.bn.history && X.bn.history.length >= 2) ? X.bn.history[X.bn.history.length - 1] - X.bn.history[X.bn.history.length - 2] : null;
+    X.planPace = X.bn && X.bn.pace_weekly != null ? X.bn.pace_weekly : null;
+    X.landing = function (paceWeekly, convPct) {
+      if (!X.bn || !(X.bn.value > 0) || X.remWeeks <= 0 || paceWeekly == null) return null;
+      var add = convPct != null ? paceWeekly * X.remWeeks * convPct / 100 : paceWeekly * X.remWeeks * K.as_is / X.bn.value;
+      return floorSafe(K.as_is + add);
+    };
+    X.landCur = X.landing(X.curPace);
+    X.landPlan = X.landing(X.planPace);
+    X.needPace = (X.bn && K.as_is > 0 && X.remWeeks > 0) ? Math.ceil((K.to_be - K.as_is) * (X.bn.value / K.as_is) / X.remWeeks - 1e-9) : null;
+    X.expected = (X.bn && X.planPace != null && X.bn.value > 0) ? floorSafe(X.planPace * X.weekNo * K.as_is / X.bn.value) : null;
+    X.convPct = (X.bn && X.bn.value > 0) ? Math.round(K.as_is / X.bn.value * 1000) / 10 : null;
+    X.tasks = D.tasks || [];
+    X.isLate = function (t) { var d = pd(t.due); return !!d && d < X.today && t.state !== "完了" && t.state !== "中止"; };
+    X.lateTasks = X.tasks.filter(X.isLate);
+    X.members = D.members || [];
+    X.names = X.members.map(function (m) { return m.name; });
+    X.scope = "";
+    var saved = load("tp-scope");
+    if (saved && X.names.indexOf(saved) >= 0) X.scope = saved;
+    X.wpNames = {}; X.wpById = {};
+    (D.wps || []).forEach(function (w) { X.wpById[w.id] = w; if (w.name) X.wpNames[w.id] = w.name; });
+    X.tasks.forEach(function (t) { var m = /^(WP-\d+)\s*(.*)$/.exec(t.wp || ""); if (m && !X.wpNames[m[1]]) X.wpNames[m[1]] = m[2] || ""; });
+    X.taskById = {};
+    X.tasks.forEach(function (t) { X.taskById[t.id] = t; });
+
+    /* ---------- 題・切り替え行・一言 ---------- */
+    doc.querySelector("[data-project-name]").textContent = P.name;
+    var st = doc.querySelector("[data-project-status]");
+    if (P.status) { st.textContent = P.status; st.hidden = false; st.className = "dna-status " + (P.status === "危険" ? "down" : P.status === "進行中" ? "info" : "is-neutral"); }
+    var sub = doc.querySelector("[data-project-sub]");
+    clear(sub);
+    append(sub, [
+      el("span", { text: P.org || "" }), el("span", { class: "sep", text: "・" }),
+      el("span", { text: fmtYMD(X.pStart) + " → " + fmtYMD(X.pEnd) }), el("span", { class: "sep", text: "・" }),
+      el("span", {}, ["第", el("b", { text: X.weekNo }), "週 / 全", el("b", { text: X.totalWeeks }), "週"]), el("span", { class: "sep", text: "・" }),
+      el("span", {}, ["基準日 ", el("b", { text: fmtYMD(X.today) })]), el("span", { class: "sep", text: "・" }),
+      labeled("責任者", P.pm), el("span", { class: "sep", text: "・" }),
+      labeled("決める人", P.leader)
+    ]);
+    var sel = doc.querySelector("[data-scope]");
+    X.names.forEach(function (n) { sel.appendChild(el("option", { value: n, text: n })); });
+    sel.value = X.scope;
+    sel.addEventListener("change", function () { X.scope = sel.value; store("tp-scope", X.scope || null); renderScoped(); });
+
+    if (D.headline && D.headline.text) {
+      var hw = doc.querySelector("[data-headline-wrap]"), ht = doc.querySelector("[data-headline]");
+      hw.hidden = false;
+      /* 全体をエスケープしてから <mark> だけ戻す（innerHTML はここだけ） */
+      ht.innerHTML = esc(D.headline.text).replace(/&lt;mark&gt;/g, "<mark>").replace(/&lt;\/mark&gt;/g, "</mark>");
+      if (D.headline.sub) {
+        var hf = doc.querySelector("[data-headline-fold]");
+        hf.hidden = false;
+        hf.appendChild(fold("続きを見る", el("p", { text: D.headline.sub })));
+        hf.className = "tp-fold";
+      }
+    }
+
+    /* タスク画面の絞り込みの状態と、描いた要素の控え（描画より前に初期化する） */
+    var TF = { view: "kanban", state: "", owner: "", late: false };
+    var taskEls = { cards: [], rows: [] };
+
+    /* ---------- 4画面を描く ---------- */
+    renderDashboard(doc.querySelector("[data-dash-root]"));
+    renderTasks(doc.querySelector("[data-tasks-root]"));
+    renderMembers(doc.querySelector("[data-members-root]"));
+    renderMeeting(doc.querySelector("[data-meeting-root]"));
+    renderFooter(doc.querySelector("[data-foot]"));
+    renderScoped();
+
+    /* ---------- 切り替え（hashchange） ---------- */
+    var VIEWS = { dashboard: "計器盤", tasks: "タスク", members: "メンバー", meeting: "会議" };
+    function route() {
+      var h = (location.hash || "#dashboard").replace(/^#/, "").split("?")[0];
+      if (!VIEWS[h]) h = "dashboard";
+      doc.querySelectorAll("[data-view]").forEach(function (s) { s.hidden = s.getAttribute("data-view") !== h; });
+      doc.querySelectorAll("[data-view-link]").forEach(function (a) {
+        var on = a.getAttribute("data-view-link") === h;
+        a.classList.toggle("on", on);
+        if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+      });
+      doc.title = P.name + " — " + VIEWS[h];
+    }
+    window.addEventListener("hashchange", route);
+    route();
+
+    /* ======================================================
+       計器盤
+       ====================================================== */
+    function renderDashboard(host) {
+      clear(host);
+      host.appendChild(signalsCard());
+      host.appendChild(el("div", { class: "tp-grid-2" }, [kgiCard(), decideCard()]));
+      host.appendChild(el("div", { class: "tp-grid-4" }, (D.kpi || []).map(kpiCard)));
+      host.appendChild(scheduleCard());
+      host.appendChild(el("div", { class: "tp-grid-eq" }, [tasksBreakdownCard(), risksCard()]));
+    }
+
+    function signalsCard() {
+      var card = el("section", { class: "dna-card tp-signals-card", "aria-label": "健全性 5観点" });
+      var wrap = el("div", { class: "tp-signals-wrap" });
+      wrap.appendChild(el("span", { class: "dna-metric-label", title: "スケジュール・スコープ・品質・チーム・リスクを人が判定した5つの信号" }, el("span", { class: "u", text: "健全性" })));
+      var list = el("div", { class: "tp-signals", role: "group", "aria-label": "5観点の信号" });
+      var why = el("div", { class: "tp-sig-why", hidden: true, id: "tp-sig-why" });
+      var btns = [];
+      (D.health || []).forEach(function (h, i) {
+        var s = SIG[h.signal] || SIG.warn;
+        var b = el("button", { type: "button", class: "tp-signal " + s.cls, "aria-expanded": "false", "aria-controls": "tp-sig-why", title: "押すと判定の理由" }, [
+          el("i", { class: "dot", "aria-hidden": "true" }),
+          el("span", { class: "t" }, [el("b", { text: h.name }), el("small", { text: h.label || s.label })])
+        ]);
+        b.addEventListener("click", function () {
+          var open = b.getAttribute("aria-expanded") !== "true";
+          btns.forEach(function (x) { x.setAttribute("aria-expanded", "false"); });
+          if (open) {
+            b.setAttribute("aria-expanded", "true");
+            clear(why); append(why, [el("b", { text: h.name + "：" + (h.label || s.label) }), " — ", h.why || ""]);
+            why.hidden = false;
+          } else why.hidden = true;
+        });
+        btns.push(b); list.appendChild(b);
+      });
+      wrap.appendChild(list);
+      card.appendChild(wrap);
+      card.appendChild(why);
+      return card;
+    }
+
+    function kgiCard() {
+      var card = el("section", { class: "dna-card tp-kgi", "aria-label": "目標に対していまどこ" });
+      var head = el("div", { class: "tp-card-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, [el("span", { class: "u", text: "KGI" }), el("span", { class: "tp-gloss", style: "margin:0", text: "最終目標の数字" })]));
+      var jr = el("div", { class: "right" });
+      if (K.judge) jr.appendChild(pill(K.judge_label || (SIG[K.judge] || {}).label || K.judge, (SIG[K.judge] || {}).pill || "is-neutral"));
+      head.appendChild(jr);
+      card.appendChild(head);
+      card.appendChild(el("h2", { class: "tp-card-title", text: K.title }));
+      if (K.gloss) card.appendChild(el("p", { class: "tp-gloss", text: K.gloss }));
+
+      var body = el("div", { class: "tp-kgi-body" });
+      body.appendChild(gaugeSvg());
+      /* 形の凡例（数字つき） */
+      var lg = el("div", { class: "tp-legend" });
+      function row(swCls, k, sub, v, u, extra) {
+        var r = el("div", { class: "row" });
+        r.appendChild(el("i", { class: "sw " + swCls, "aria-hidden": "true" }));
+        var kk = el("span", { class: "k", text: k }); if (sub) kk.appendChild(el("small", { text: sub }));
+        r.appendChild(kk);
+        var vv = el("span", { class: "v" }, [v == null ? "—" : fmtNum(v), el("span", { class: "u", text: u })]);
+        if (extra) vv.appendChild(extra);
+        r.appendChild(vv);
+        return r;
+      }
+      var dAsIs = null;
+      if (X.kgiDelta != null) dAsIs = el("span", { class: "dna-delta " + (X.kgiDelta > 0 ? "up" : X.kgiDelta < 0 ? "down" : ""), text: (X.kgiDelta > 0 ? "+" : "") + X.kgiDelta + " 前週比" });
+      lg.appendChild(row("grad", "いま", "基準日 " + fmtYMD(pd(K.as_of) || X.today), K.as_is, K.unit, dAsIs));
+      if (X.expected != null) {
+        var diff = K.as_is - X.expected;
+        lg.appendChild(row("tick", "今日までの予定", "計画の進みなら届いているはずの数", X.expected, K.unit,
+          el("span", { class: "dna-delta " + (diff < 0 ? "down" : diff > 0 ? "up" : ""), text: (diff > 0 ? "+" : "") + diff })));
+      }
+      if (X.landCur != null) lg.appendChild(row("ghost", "このペースの見込み", "いまの週ペースのまま期限を迎えると", X.landCur, K.unit));
+      lg.appendChild(row("goal", "目標", "期限 " + fmtYMD(X.deadline) + "（残り " + X.remDeadlineWeeks + "週）", K.to_be, K.unit));
+      body.appendChild(lg);
+      card.appendChild(body);
+
+      /* 律速（どこが詰まっているか） */
+      if (X.bn) {
+        var bn = el("div", { class: "tp-bn" });
+        bn.appendChild(el("span", { class: "dna-tag t-amber", title: "一番詰まっていて、全体の速さを決めている段", text: "律速" }));
+        bn.appendChild(el("span", { class: "n", text: X.bn.name }));
+        if (X.curPace != null) bn.appendChild(el("span", { class: "pace" }, ["いま 週", el("b", { text: fmtNum(X.curPace) }), X.bn.unit]));
+        if (X.needPace != null) { bn.appendChild(el("span", { class: "arrow", "aria-hidden": "true", text: "→" })); bn.appendChild(el("span", { class: "pace need" }, ["目標に届くには 週", el("b", { text: fmtNum(X.needPace) }), X.bn.unit])); }
+        if (X.landPlan != null && X.planPace != null) bn.appendChild(el("span", { style: "color:var(--dna-ink-3);font-size:12.5px", text: "（週" + fmtNum(X.planPace) + "なら " + fmtNum(X.landPlan) + K.unit + "）" }));
+        card.appendChild(bn);
+      }
+      if (K.judge_reason) card.appendChild(fold("判定の理由", el("p", { text: K.judge_reason })));
+      return card;
+    }
+
+    function gaugeSvg() {
+      var W = 300, H = 236, cx = 150, cy = 122, R = 94;
+      var s = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "tp-gauge", role: "img",
+        "aria-label": K.title + "：いま " + K.as_is + K.unit + "、目標 " + K.to_be + K.unit + (X.expected != null ? "、今日までの予定 " + X.expected + K.unit : "") + (X.landCur != null ? "、このペースの見込み " + X.landCur + K.unit : "") });
+      var defs = svg("defs");
+      var g = svg("linearGradient", { id: "tp-grad", x1: "0", y1: "0", x2: "1", y2: "0" });
+      g.appendChild(svg("stop", { offset: "0", class: "tp-stop-a", "stop-color": "#2f7bf2" }));
+      g.appendChild(svg("stop", { offset: "1", class: "tp-stop-b", "stop-color": "#35c3e8" }));
+      defs.appendChild(g); s.appendChild(defs);
+      function pt(a, r) { var t = a * Math.PI / 180; r = r == null ? R : r; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; }
+      function arc(f0, f1) {
+        f0 = clamp01(f0); f1 = clamp01(f1); if (f1 <= f0) return "";
+        var a0 = 135 + 270 * f0, a1 = 135 + 270 * f1, p0 = pt(a0), p1 = pt(a1), large = (a1 - a0) > 180 ? 1 : 0;
+        return "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) + " A" + R + " " + R + " 0 " + large + " 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2);
+      }
+      var fNow = K.to_be > 0 ? K.as_is / K.to_be : 0;
+      var fLand = X.landCur != null && K.to_be > 0 ? X.landCur / K.to_be : null;
+      var fExp = X.expected != null && K.to_be > 0 ? X.expected / K.to_be : null;
+      s.appendChild(svg("path", { d: arc(0, 1), class: "track" }));
+      if (fLand != null && fLand > fNow) s.appendChild(svg("path", { d: arc(fNow, fLand), class: "ghost" }));
+      if (fNow > 0) s.appendChild(svg("path", { d: arc(0, fNow), class: "fill" }));
+      /* 今日までの予定の印 */
+      if (fExp != null) {
+        var a = 135 + 270 * clamp01(fExp), q0 = pt(a, R - 14), q1 = pt(a, R + 14);
+        s.appendChild(svg("line", { x1: q0[0].toFixed(1), y1: q0[1].toFixed(1), x2: q1[0].toFixed(1), y2: q1[1].toFixed(1), class: "tick" }));
+        var lp = pt(a, R + 24), cs = Math.cos(a * Math.PI / 180), sn = Math.sin(a * Math.PI / 180);
+        var anchor = cs < -0.3 ? "end" : cs > 0.3 ? "start" : "middle";
+        s.appendChild(svg("text", { x: lp[0].toFixed(1), y: (lp[1] + (sn < -0.3 ? -2 : 5)).toFixed(1), class: "lbl strong", "text-anchor": anchor, text: "予定 " + X.expected }));
+      }
+      var p0 = pt(135, R + 4), p1 = pt(45, R + 4);
+      s.appendChild(svg("text", { x: p0[0].toFixed(1), y: (p0[1] + 24).toFixed(1), class: "lbl", "text-anchor": "middle", text: "0" }));
+      s.appendChild(svg("text", { x: p1[0].toFixed(1), y: (p1[1] + 24).toFixed(1), class: "lbl", "text-anchor": "middle", text: "目標 " + K.to_be + K.unit }));
+      s.appendChild(svg("text", { x: cx, y: cy - 30, class: "hero-top", "text-anchor": "middle", text: "いま" }));
+      s.appendChild(svg("text", { x: cx, y: cy + 12, class: "hero", "text-anchor": "middle", text: String(K.as_is) }));
+      s.appendChild(svg("text", { x: cx, y: cy + 34, class: "hero-sub", "text-anchor": "middle", text: "/ " + K.to_be + " " + K.unit }));
+      s.appendChild(svg("text", { x: cx, y: cy + 54, class: "hero-top", "text-anchor": "middle", text: "達成 " + pct(K.as_is, K.to_be) + "%" }));
+      return s;
+    }
+
+    function decideCard() {
+      var card = el("section", { class: "dna-card", "aria-label": "今週決めること" });
+      var head = el("div", { class: "tp-card-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, [el("span", { class: "u", text: "今週決めること" }), el("span", { class: "tp-gloss", style: "margin:0", text: "まだ決まっていない選択肢" })]));
+      var nm = D.next_meeting;
+      if (nm && nm.date) head.appendChild(el("div", { class: "right" }, el("span", { class: "dna-status info", text: "次回 " + fmtMDW(pd(nm.date)) + " " + (nm.time || "").split("〜")[0] })));
+      card.appendChild(head);
+      var list = el("div", { class: "tp-decide" });
+      (D.decide || []).forEach(function (d, i) {
+        var r = el("div", { class: "tp-decide-row" });
+        r.appendChild(el("span", { class: "no", text: d.no != null ? d.no : (i + 1) }));
+        var t = el("div", { class: "t" });
+        t.appendChild(el("b", { text: d.title }));
+        t.appendChild(el("span", { class: "who" }, [ava(d.owner, 16), el("span", { text: d.owner + " が決める" })]));
+        r.appendChild(t);
+        var lv = d.landing_lever || {};
+        var land = X.landing(lv.pace_weekly, lv.conv_rate);
+        if (land != null) {
+          var pctw = clamp01(land / K.to_be) * 100;
+          r.appendChild(el("div", { class: "tp-land" }, [
+            el("span", { class: "lbl", text: "採ると着地" }),
+            el("u", {}, [el("i", { style: "width:" + pctw + "%" }), el("span", { class: "goalmark", "aria-hidden": "true" })]),
+            el("b", { text: fmtNum(land) }, el("small", { text: K.unit }))
+          ]));
+        }
+        var body = [];
+        if (d.text) body.push(el("p", { text: d.text }));
+        if (d.related && d.related.length) body.push(el("div", { class: "li" }, [el("span", { text: "関連" }), el("b", { text: d.related.map(shortId).join("・") })]));
+        if (body.length) { var f = fold("内容と関連", body); f.classList.add("tp-col2"); r.appendChild(f); }
+        list.appendChild(r);
+      });
+      card.appendChild(list);
+      if (X.landCur != null) {
+        card.appendChild(el("div", { class: "tp-land base" }, [
+          el("span", { class: "lbl", text: "決めずにこのまま" }),
+          el("u", { class: "base" }, [el("i", { style: "width:" + clamp01(X.landCur / K.to_be) * 100 + "%" }), el("span", { class: "goalmark", "aria-hidden": "true" })]),
+          el("b", { text: fmtNum(X.landCur) }, el("small", { text: K.unit }))
+        ]));
+        card.appendChild(el("p", { class: "tp-note", text: "棒の右端 ＝ 目標 " + K.to_be + K.unit + "。着地は期限時点の試算。" }));
+      }
+      return card;
+    }
+
+    function kpiCard(k) {
+      var card = el("section", { class: "dna-card tp-kpi", "aria-label": k.name });
+      var head = el("div", { class: "tp-kpi-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, el("span", { class: "u", text: k.name })));
+      if (k.bottleneck) head.appendChild(el("span", { class: "dna-tag t-amber", title: "一番詰まっていて、全体の速さを決めている段", text: "律速" }));
+      card.appendChild(head);
+      if (k.gloss) card.appendChild(el("p", { class: "tp-gloss", text: k.gloss, title: k.gloss }));
+      var body = el("div", { class: "dna-kpi-body" });
+      var val = el("span", { class: "dna-kpi-value" }, [el("b", { text: fmtNum(k.value) }), el("span", { class: "unit", text: k.unit })]);
+      var prev = (k.history && k.history.length >= 2) ? k.history[k.history.length - 2] : null;
+      if (prev != null) {
+        var d = k.value - prev, good = k.good_when === "down" ? d < 0 : d > 0;
+        val.appendChild(el("span", { class: "dna-delta " + (d === 0 ? "" : good ? "up" : "down"), title: "前週比", text: (d > 0 ? "+" : "") + fmtNum(d) + (k.unit === "%" ? "pt" : "") }));
+      }
+      body.appendChild(val);
+      body.appendChild(miniBars(k));
+      card.appendChild(body);
+      var foot = el("p", { class: "tp-kpi-foot" }, [
+        el("span", {}, ["目標 ", el("b", { text: fmtNum(k.target) + k.unit })]),
+        el("span", {}, ["達成 ", el("b", { text: pct(k.value, k.target) + "%" })]),
+        el("span", { class: "asof", text: (k.agg ? k.agg + "・" : "") + (k.as_of || "") })
+      ]);
+      card.appendChild(foot);
+      if (k.note) card.appendChild(fold("注記", el("p", { text: k.note })));
+      return card;
+    }
+
+    function miniBars(k) {
+      var W = 92, H = 46, top = 8, base = 42, bw = 12, gap = 6;
+      var hist = (k.history || []).slice(-7);
+      var max = Math.max(k.target || 0, Math.max.apply(null, hist.concat([0]))) || 1;
+      var s = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "tp-mini", role: "img", "aria-label": "推移 " + hist.join("→") + "、目標 " + k.target });
+      var total = hist.length * bw + (hist.length - 1) * gap, x0 = W - 26 - total;
+      hist.forEach(function (v, i) {
+        var h = Math.max(2, (base - top) * v / max);
+        s.appendChild(svg("rect", { x: x0 + i * (bw + gap), y: base - h, width: bw, height: h, rx: 2.5, class: "bar" + (i === hist.length - 1 ? " hot" : "") }));
+      });
+      if (k.target != null) {
+        var gy = base - (base - top) * k.target / max;
+        s.appendChild(svg("line", { x1: x0 - 4, y1: gy.toFixed(1), x2: W - 26, y2: gy.toFixed(1), class: "goal" }));
+        s.appendChild(svg("text", { x: W - 22, y: Math.max(top + 3, Math.min(base, gy + 4)).toFixed(1), class: "goal-t", text: "目標" }));
+      }
+      return s;
+    }
+
+    function scheduleCard() {
+      var M = D.milestones || {}, phases = M.phases || [];
+      var card = el("section", { class: "dna-card", "aria-label": "スケジュール" });
+      var head = el("div", { class: "tp-card-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, [el("span", { class: "u", text: "スケジュール" }), el("span", { class: "tp-gloss", style: "margin:0", text: "フェーズ（重点期間）とゲート（次へ進む条件と判定日）" })]));
+      head.appendChild(el("div", { class: "right" }, el("span", { class: "tp-note", style: "margin:0", text: "全 " + X.totalWeeks + "週 ・ 今日は第 " + X.weekNo + "週" })));
+      card.appendChild(head);
+      var total = days(X.pStart, X.pEnd) + 1;
+      function px(d) { return clamp01(days(X.pStart, d) / total) * 100; }
+      var wrap = el("div", { class: "tp-band-wrap" });
+      var band = el("div", { class: "tp-band", role: "img", "aria-label": "全期間の帯。今日 " + fmtYMD(X.today) });
+      var listEl = el("div", { class: "tp-phaselist" });
+      phases.forEach(function (p, i) {
+        var s = pd(p.start), e = pd(p.end);
+        var state = X.today > e ? "is-past" : X.today < s ? "is-next" : "is-now";
+        var seg = el("div", { class: "tp-phase " + state + (i === phases.length - 1 ? " is-last" : ""), style: "left:" + px(s) + "%;width:" + (clamp01((days(s, e) + 1) / total) * 100) + "%", title: p.name + " " + fmtYMD(s) + "〜" + fmtYMD(e) }, [
+          el("span", { class: "no", text: p.no != null ? p.no : i + 1 }), el("span", { class: "nm", text: p.name })
+        ]);
+        band.appendChild(seg);
+        var gd = pd(p.gate_date);
+        if (gd) {
+          var gate = el("div", { class: "tp-gate" + (p.gate_done ? " is-done" : ""), style: "left:" + px(addDays(gd, 1)) + "%", title: "ゲート: " + (p.gate || "") + "（" + (p.gate_note || "") + "）" }, [
+            el("i", {}, p.gate_done ? checkIcon() : null), el("small", { text: fmtMD(gd) })
+          ]);
+          band.appendChild(gate);
+        }
+        var ph = el("div", { class: "ph " + state }, [
+          el("span", { class: "no", text: p.no != null ? p.no : i + 1 }),
+          el("span", { class: "nm", text: p.name }),
+          el("span", { class: "dt", text: fmtMD(s) + " → " + fmtMD(e) }),
+          el("span", { class: "gt" }, [pill(p.gate_done ? "通過" : "未判定", p.gate_done ? "up" : "is-neutral"), el("span", { text: p.gate || "" })])
+        ]);
+        listEl.appendChild(ph);
+      });
+      var tx = px(addDays(X.today, 1));
+      band.appendChild(el("div", { class: "tp-today", style: "left:" + tx + "%", "aria-hidden": "true" }));
+      band.appendChild(el("span", { class: "tp-today-tag", style: "left:" + tx + "%", text: "今日 " + fmtMD(X.today) }));
+      wrap.appendChild(band);
+      card.appendChild(wrap);
+      card.appendChild(listEl);
+      if (M.overlap_note) card.appendChild(fold("フェーズの読み方", el("p", { text: M.overlap_note })));
+      return card;
+    }
+
+    function tasksBreakdownCard() {
+      var O = D.output || {};
+      var card = el("section", { class: "dna-card", "aria-label": "タスクの状態" });
+      var head = el("div", { class: "tp-card-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, el("span", { class: "u", text: "タスクの状態" })));
+      head.appendChild(el("div", { class: "right" }, el("a", { class: "tp-link", href: "#tasks", text: "タスクの画面へ →" })));
+      card.appendChild(head);
+      var counts = {}; X.tasks.forEach(function (t) { counts[t.state] = (counts[t.state] || 0) + 1; });
+      var row1 = el("div", { class: "tp-stackrow" });
+      row1.appendChild(el("div", { class: "h" }, ["現役タスク ", el("b", { text: X.tasks.length }), "件", el("small", { text: "完了・中止を除く" })]));
+      row1.appendChild(stackBar(counts, TSTATES, X.tasks.length, { label: "状態の内訳" }));
+      var lg = el("div", { class: "tp-stack-legend" });
+      TSTATES.forEach(function (st) { lg.appendChild(el("span", {}, [el("i", { class: STACK[st], style: "background:" + stackColor(st) }), st + " ", el("b", { text: counts[st] || 0 })])); });
+      lg.appendChild(el("span", { class: "late" }, [el("i"), "遅れ ", el("b", { text: X.lateTasks.length }), "件"]));
+      row1.appendChild(lg);
+      card.appendChild(row1);
+      if (O.wp_total != null) {
+        var row2 = el("div", { class: "tp-stackrow" });
+        row2.appendChild(el("div", { class: "h" }, ["出来高（WP） ", el("b", { text: O.wp_done + " / " + O.wp_total }), el("small", { text: "終わった成果物の束 ・ 今日までの予定 " + (O.wp_done_plan != null ? O.wp_done_plan : "—") })]));
+        var bar = el("div", { class: "tp-stack", role: "img", "aria-label": "WP 完了 " + O.wp_done + "、進行中 " + O.wp_doing + "、未着手 " + O.wp_todo });
+        if (O.wp_done > 0) bar.appendChild(el("i", { class: "s-done", style: "width:" + (O.wp_done / O.wp_total * 100) + "%" }));
+        if (O.wp_doing > 0) bar.appendChild(el("i", { class: "s-review", style: "width:" + (O.wp_doing / O.wp_total * 100) + "%" }));
+        if (O.wp_done_plan != null) bar.appendChild(el("span", { class: "plan", style: "left:" + (O.wp_done_plan / O.wp_total * 100) + "%", title: "今日までの予定 " + O.wp_done_plan, "aria-hidden": "true" }));
+        row2.appendChild(bar);
+        row2.appendChild(el("div", { class: "tp-stack-legend" }, [
+          el("span", {}, [el("i", { style: "background:var(--dna-grad-a)" }), "完了 ", el("b", { text: O.wp_done })]),
+          el("span", {}, [el("i", { style: "background:var(--dna-chart-soft)" }), "進行中 ", el("b", { text: O.wp_doing })]),
+          el("span", {}, [el("i", { style: "background:var(--dna-progress-track);box-shadow:inset 0 0 0 1px var(--dna-border-strong)" }), "未着手 ", el("b", { text: O.wp_todo })])
+        ]));
+        card.appendChild(row2);
+      }
+      if (O.tasks_due_week != null) {
+        var row3 = el("div", { class: "tp-stackrow" });
+        row3.appendChild(el("div", { class: "h" }, ["今週の実行率", el("small", { text: "完了 ÷ 期限が来たタスク" })]));
+        row3.appendChild(el("div", { class: "tp-rate" }, [
+          el("u", {}, el("i", { style: "width:" + (hasRate(O.tasks_due_week) ? pct(O.tasks_done_week, O.tasks_due_week) : 0) + "%" })),
+          el("b", { text: rateText(O.tasks_done_week, O.tasks_due_week) }),
+          el("small", { text: hasRate(O.tasks_due_week) ? O.tasks_done_week + " / " + O.tasks_due_week + "件" : "期限が来たタスクはまだありません" })
+        ]));
+        card.appendChild(row3);
+      }
+      return card;
+    }
+    function stackColor(st) { return { "未着手": "var(--dna-control-off)", "進行中": "var(--dna-chart)", "レビュー待ち": "var(--dna-chart-soft)", "ブロック": "var(--dna-down)" }[st] || "var(--dna-ink-faint)"; }
+
+    function risksCard() {
+      var card = el("section", { class: "dna-card", "aria-label": "効いているリスクと課題" });
+      var head = el("div", { class: "tp-card-head" });
+      head.appendChild(el("span", { class: "dna-metric-label" }, [el("span", { class: "u", text: "効いているリスク・課題" }), el("span", { class: "tp-gloss", style: "margin:0", text: "リスク＝起きるかもしれないこと ／ 課題＝もう起きて止めていること" })]));
+      card.appendChild(head);
+      var list = el("div", { class: "tp-ri" });
+      var issues = (D.issues || []).filter(function (i) { return i.state !== "クローズ"; });
+      var risks = D.risks || [];
+      var active = risks.filter(function (r) { return r.state === "兆候あり" || r.state === "顕在化"; });
+      var watching = risks.filter(function (r) { return r.state === "監視中"; });
+      function riRow(kind, item, metaKids, foldKids) {
+        var r = el("div", { class: "tp-ri-row" });
+        r.appendChild(el("div", { class: "st", "data-id": shortId(item.id) }, [pill(item.state), el("small", { text: kind, title: kind + " " + shortId(item.id) })]));
+        r.appendChild(el("div", { class: "tx", text: item.text }));
+        r.appendChild(el("div", { class: "meta" }, metaKids));
+        if (foldKids && foldKids.length) { var f = fold("対応", foldKids); f.classList.add("tp-col2", "tp-mt0"); r.appendChild(f); }
+        return r;
+      }
+      issues.forEach(function (i) {
+        list.appendChild(riRow("課題", i, [el("span", {}, ["担当 ", el("b", { text: i.owner })]), el("span", {}, ["期限 ", due(i.due)])], i.impact ? [el("div", { class: "li" }, [el("span", { text: "影響" }), el("b", { text: i.impact })])] : null));
+      });
+      active.forEach(function (r) {
+        list.appendChild(riRow("リスク", r, [el("span", {}, ["影響 ", el("b", { text: r.impact })]), el("span", {}, ["見張り ", el("b", { text: r.watcher })])], r.plan ? [el("div", { class: "li" }, [el("span", { text: "対応" }), el("b", { text: r.plan })])] : null));
+      });
+      if (!issues.length && !active.length) list.appendChild(el("p", { class: "tp-note", text: "いま効いているリスク・課題はありません。" }));
+      card.appendChild(list);
+      if (watching.length) {
+        card.appendChild(fold("監視中のリスク " + watching.length + "件", watching.map(function (r) {
+          return el("div", { class: "li", style: "align-items:flex-start" }, [el("span", { text: shortId(r.id) }), el("b", { text: r.text + (r.plan ? " ／ 対応: " + r.plan : "") + " ／ 見張り: " + r.watcher })]);
+        })));
+      }
+      return card;
+    }
+
+    /* ======================================================
+       この人の今週（見る人の帯） ・ 見る人に応じた再描画
+       ====================================================== */
+    function renderScoped() {
+      var panel = doc.querySelector("[data-member-panel]");
+      var m = X.members.filter(function (x) { return x.name === X.scope; })[0] || null;
+      clear(panel);
+      if (!m) panel.hidden = true; else { panel.hidden = false; memberPanel(panel, m); }
+      applyTaskFilters();
+      doc.querySelectorAll("[data-member-card]").forEach(function (c) {
+        var me = c.getAttribute("data-member-card") === X.scope;
+        c.classList.toggle("is-me", me);
+        var mark = c.querySelector("[data-me-mark]"); if (mark) mark.hidden = !me;
+      });
+      doc.querySelectorAll("[data-owner-row]").forEach(function (r) { r.classList.toggle("is-me", !!X.scope && r.getAttribute("data-owner-row") === X.scope); });
+    }
+
+    function memberPanel(panel, m) {
+      var mine = X.tasks.filter(function (t) { return t.owner === m.name; });
+      var late = mine.filter(X.isLate);
+      var kdi = (D.kdi || []).filter(function (k) { return k.owner === m.name; });
+      var ph = el("div", { class: "ph" }, [
+        ava(m.name, 40),
+        el("div", { class: "t" }, [el("span", { class: "n", text: m.name + " の今週" }), el("span", { class: "r", text: m.role || "" })]),
+        el("div", { class: "right" }, [el("span", { class: "dna-status info", text: "見る人" })])
+      ]);
+      panel.appendChild(ph);
+      var grid = el("div", { class: "tp-mpanel-grid" });
+      /* 行動量 */
+      var b1 = el("div", { class: "tp-blk" }, el("span", { class: "k", text: "今週の行動量（KDI＝自分で動かせる行動の数）" }));
+      if (kdi.length) b1.appendChild(kdiRows(kdi)); else b1.appendChild(el("p", { class: "tp-note", style: "margin:0", text: "今週の行動量の担当はありません" }));
+      grid.appendChild(b1);
+      /* タスク */
+      var b2 = el("div", { class: "tp-blk" }, el("span", { class: "k", text: "現役タスク" }));
+      b2.appendChild(el("span", { class: "big" }, [mine.length, el("small", { text: "件" }), late.length ? el("span", { class: "late", text: "遅れ " + late.length }) : null]));
+      var counts = {}; mine.forEach(function (t) { counts[t.state] = (counts[t.state] || 0) + 1; });
+      var sb = stackBar(counts, TSTATES, mine.length); sb.style.marginTop = "6px"; sb.style.height = "8px";
+      b2.appendChild(sb);
+      var ml = el("div", { class: "tp-mini-list", style: "margin-top:8px" });
+      mine.slice().sort(function (a, b) { return String(a.due).localeCompare(String(b.due)); }).slice(0, 3).forEach(function (t) {
+        ml.appendChild(el("div", { class: "r" }, [due(t.due), el("span", { class: "tx", text: t.text, title: t.text })]));
+      });
+      if (mine.length > 3) ml.appendChild(el("a", { class: "tp-link", href: "#tasks", style: "font-size:12.5px", text: "ほか " + (mine.length - 3) + "件 →" }));
+      b2.appendChild(ml);
+      grid.appendChild(b2);
+      /* 担当の束 */
+      grid.appendChild(el("div", { class: "tp-blk" }, [el("span", { class: "k", text: "担当の束（WP＝成果物の束・A＝責任者・R＝実行）" }), raciTags(m.raci)]));
+      /* 前回の会議の自分のぶん */
+      var b4 = el("div", { class: "tp-blk" }, el("span", { class: "k", text: "前回の会議の自分のぶん" }));
+      var LM = D.last_meeting;
+      if (LM) {
+        var rv = (LM.review || []).filter(function (r) { return r.owner === m.name; });
+        var ac = (LM.actions || []).filter(function (a) { return a.owner === m.name; });
+        var l4 = el("div", { class: "tp-mini-list" });
+        rv.forEach(function (r) { l4.appendChild(el("div", { class: "r" }, [el("span", { class: "tx", text: "検収: " + r.task, title: r.task }), pill(r.state)])); });
+        ac.forEach(function (a) { var t = a.task ? X.taskById[a.task] : null; l4.appendChild(el("div", { class: "r" }, [due(a.due, { done: !t }), el("span", { class: "tx", text: a.text, title: a.text }), t ? pill(t.state) : pill("終わった", "is-neutral")])); });
+        if (!rv.length && !ac.length) l4.appendChild(el("p", { class: "tp-note", style: "margin:0", text: "前回の会議に自分のぶんはありません" }));
+        b4.appendChild(l4);
+      } else b4.appendChild(el("p", { class: "tp-note", style: "margin:0", text: "前回の会議録はまだありません" }));
+      grid.appendChild(b4);
+      panel.appendChild(grid);
+    }
+
+    function kdiRows(list) {
+      var w = el("div", { class: "tp-kdi" });
+      list.forEach(function (k) {
+        var r = el("div", { class: "r", title: k.gloss || "" });
+        r.appendChild(el("span", { class: "nm", text: k.name }));
+        var short = k.actual < k.target;
+        r.appendChild(el("u", {}, el("i", { class: short ? "short" : "", style: "width:" + clamp01(k.target > 0 ? k.actual / k.target : 0) * 100 + "%" })));
+        r.appendChild(el("b", {}, [fmtNum(k.actual), el("small", { text: " / " + fmtNum(k.target) + k.unit })]));
+        w.appendChild(r);
+      });
+      return w;
+    }
+    function raciTags(raci) {
+      var wrap = el("div", { class: "tags" }), a = [], r = [], c = 0, i = 0;
+      Object.keys(raci || {}).forEach(function (wp) { var v = raci[wp]; if (v === "A") a.push(wp); else if (v === "R") r.push(wp); else if (v === "C") c++; else if (v === "I") i++; });
+      function wpTag(wp, roleLetter, roleWord, cls) {
+        var w = X.wpById[wp], nm = X.wpNames[wp] || "";
+        var kids = [el("b", { text: nm || wp }), el("small", { text: roleLetter })];
+        if (w && w.state) kids.push(el("i", { class: "st", text: "・" + w.state }));
+        var t = el("span", { class: "dna-tag " + cls + " tp-wp", title: wp + "  " + (nm || "（名前は計画に未記入）") + "  ／ " + roleWord + (w && w.state ? " ／ いまの状態 " + w.state : "") }, kids);
+        return t;
+      }
+      a.forEach(function (wp) { wrap.appendChild(wpTag(wp, "A", "A＝責任者（この束の説明責任を持つ）", "t-blue")); });
+      r.forEach(function (wp) { wrap.appendChild(wpTag(wp, "R", "R＝実行", "t-neutral")); });
+      if (c || i) wrap.appendChild(el("span", { class: "more", text: "相談 C " + c + " ・ 共有 I " + i }));
+      if (!a.length && !r.length && !c && !i) wrap.appendChild(el("span", { class: "more", text: "—" }));
+      return wrap;
+    }
+
+    /* ======================================================
+       タスク（看板 ⇄ 一覧表）
+       ====================================================== */
+    /* 状態は上（4画面を描く前）で初期化した */
+    function renderTasks(host) {
+      clear(host);
+      var bar = el("div", { class: "dna-tb-bar" });
+      var views = el("div", { class: "dna-tb-views", role: "group", "aria-label": "見え方" });
+      var bK = el("button", { type: "button", class: "dna-tb-view on", "aria-pressed": "true", "data-tview": "kanban" }, [svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, [svg("rect", { x: 3.5, y: 4.5, width: 5.4, height: 15, rx: 1.6, "stroke-width": 1.7 }), svg("rect", { x: 12, y: 4.5, width: 5.4, height: 9, rx: 1.6, "stroke-width": 1.7 })]), "看板"]);
+      var bT = el("button", { type: "button", class: "dna-tb-view", "aria-pressed": "false", "data-tview": "table" }, [svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d: "M4 6.5h16M4 12h16M4 17.5h16", "stroke-width": 1.8, "stroke-linecap": "round" })), "一覧表"]);
+      [bK, bT].forEach(function (b) {
+        b.addEventListener("click", function () {
+          TF.view = b.getAttribute("data-tview");
+          [bK, bT].forEach(function (x) { var on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on ? "true" : "false"); });
+          host.querySelectorAll("[data-tview-panel]").forEach(function (p) { p.hidden = p.getAttribute("data-tview-panel") !== TF.view; });
+        });
+      });
+      append(views, [bK, bT]);
+      bar.appendChild(views);
+      bar.appendChild(el("div", { class: "dna-tb-right" }, [el("span", { class: "dna-tb-count", "data-task-count": "" }), el("span", { class: "dna-tb-sample", "data-sample-only": "", text: SAMPLE_WORD })]));
+      host.appendChild(bar);
+
+      var chips = el("div", { class: "dna-tb-chips", role: "group", "aria-label": "絞り込み" });
+      var chipEls = [];
+      [""].concat(TSTATES).forEach(function (st) {
+        var n = st ? X.tasks.filter(function (t) { return t.state === st; }).length : X.tasks.length;
+        var c = el("button", { type: "button", class: "dna-tb-chip" + (st === "" ? " active" : ""), "aria-pressed": st === "" ? "true" : "false", "data-state": st }, [st || "すべて", el("span", { class: "n", text: n })]);
+        c.addEventListener("click", function () {
+          TF.state = st;
+          chipEls.forEach(function (x) { var on = x === c; x.classList.toggle("active", on); x.setAttribute("aria-pressed", on ? "true" : "false"); });
+          applyTaskFilters();
+        });
+        chipEls.push(c); chips.appendChild(c);
+      });
+      chips.appendChild(el("span", { class: "tp-tb-sep", "aria-hidden": "true" }));
+      var ownerSel = el("select", { class: "tp-select", "aria-label": "担当で絞り込む", "data-owner-filter": "" }, el("option", { value: "", text: "すべて" }));
+      X.names.forEach(function (n) { ownerSel.appendChild(el("option", { value: n, text: n })); });
+      ownerSel.addEventListener("change", function () { TF.owner = ownerSel.value; applyTaskFilters(); });
+      chips.appendChild(el("label", { class: "tp-tb-select" }, ["担当", ownerSel]));
+      var lateChip = el("button", { type: "button", class: "dna-tb-chip", "aria-pressed": "false" }, ["遅れだけ", el("span", { class: "n", text: X.lateTasks.length })]);
+      lateChip.addEventListener("click", function () { TF.late = !TF.late; lateChip.classList.toggle("active", TF.late); lateChip.setAttribute("aria-pressed", TF.late ? "true" : "false"); applyTaskFilters(); });
+      chips.appendChild(lateChip);
+      host.appendChild(chips);
+
+      /* 看板 */
+      var kan = el("section", { class: "tkb-kan", "aria-label": "タスクの看板" });
+      TSTATES.forEach(function (st) {
+        var col = el("article", { class: "tkb-col " + LANE[st], "data-lane": st });
+        col.appendChild(el("span", { class: "tkb-col-rail", "aria-hidden": "true" }));
+        col.appendChild(el("header", { class: "tkb-col-head" }, [el("i", { "aria-hidden": "true" }), el("b", { text: st }), el("span", { class: "tkb-col-n", "data-lane-n": "" , text: "0" })]));
+        var body = el("div", { class: "tkb-col-body" });
+        X.tasks.filter(function (t) { return t.state === st; }).forEach(function (t) { var c = taskCard(t); taskEls.cards.push({ t: t, n: c }); body.appendChild(c); });
+        body.appendChild(el("div", { class: "tkb-col-empty", "data-lane-empty": "", text: "該当なし" }));
+        col.appendChild(body);
+        kan.appendChild(col);
+      });
+      host.appendChild(el("div", { "data-tview-panel": "kanban" }, kan));
+
+      /* 一覧表 */
+      var tcard = el("section", { class: "dna-card dna-t2-card", style: "margin-top:12px" });
+      var scroll = el("div", { class: "dna-t2-scroll" });
+      var t2 = el("div", { class: "dna-t2 is-dense", role: "table", "aria-label": "タスクの一覧" });
+      t2.appendChild(el("div", { class: "dna-t2-head", role: "row" }, [
+        el("span", { role: "columnheader", "aria-label": "詳細" }), el("span", { role: "columnheader", text: "タスク" }), el("span", { role: "columnheader", text: "担当" }),
+        el("span", { role: "columnheader", text: "状態" }), el("span", { role: "columnheader", text: "期限" }), el("span", { role: "columnheader", text: "WP（成果物の束）" })
+      ]));
+      X.tasks.forEach(function (t) { var pair = taskRow(t); taskEls.rows.push({ t: t, n: pair[0], d: pair[1] }); t2.appendChild(pair[0]); t2.appendChild(pair[1]); });
+      scroll.appendChild(t2); tcard.appendChild(scroll);
+      tcard.appendChild(el("p", { class: "dna-t2-foot", "data-sample-only": "" }, ["データは", el("b", { text: SAMPLE_WORD }), "（基準日 " + fmtYMD(X.today) + "）で、業務判断には使えません。"]));
+      host.appendChild(el("div", { "data-tview-panel": "table", hidden: true }, tcard));
+      host.appendChild(el("p", { class: "tp-empty", "data-task-empty": "", hidden: true, text: "条件に合うタスクはありません。絞り込みか見る人を見直してください。" }));
+    }
+
+    function taskCard(t) {
+      var late = X.isLate(t);
+      var card = el("article", { class: "tkb-task" + (late ? " is-over" : ""), tabindex: "0", "data-task-id": t.id, "data-owner-row": t.owner });
+      var tgl = el("button", { type: "button", class: "tkb-task-tgl", "aria-expanded": "false", "aria-label": "完了の定義を開く" }, chevDown());
+      tgl.addEventListener("click", function (ev) { ev.stopPropagation(); var open = !card.classList.contains("is-open"); card.classList.toggle("is-open", open); tgl.setAttribute("aria-expanded", open ? "true" : "false"); });
+      card.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { if (ev.target === card) { ev.preventDefault(); tgl.click(); } } });
+      card.appendChild(el("div", { class: "tkb-task-head" }, [el("strong", { class: "tkb-task-title", text: t.text }), tgl]));
+      card.appendChild(el("div", { class: "tkb-task-meta" }, [ava(t.owner, 16), el("small", { text: t.owner }), due(t.due)]));
+      var more = el("div", { class: "tkb-task-more" });
+      var inn = el("div", { class: "in" });
+      inn.appendChild(el("div", { class: "tkb-sub" }, [el("div", { class: "h", text: "完了の定義" }), el("div", { class: "it" }, [el("i", { "aria-hidden": "true" }), el("span", { text: t.dod || "—" })])]));
+      inn.appendChild(el("p", { class: "tkb-src", title: t.wp || "", text: (t.wp || "") + (t.related ? " ・ 関連 " + shortId(t.related) : "") }));
+      more.appendChild(inn); card.appendChild(more);
+      return card;
+    }
+    function taskRow(t) {
+      var row = el("div", { class: "dna-t2-row", role: "row", "data-owner-row": t.owner });
+      var detail = el("div", { class: "tp-t2-detail", hidden: true }, [
+        el("div", { class: "li" }, [el("span", { text: "完了の定義" }), el("b", { text: t.dod || "—" })]),
+        el("div", { class: "li" }, [el("span", { text: "WP" }), el("b", { text: t.wp || "—" })]),
+        t.related ? el("div", { class: "li" }, [el("span", { text: "関連" }), el("b", { text: shortId(t.related) })]) : null
+      ]);
+      var tgl = el("button", { type: "button", class: "tp-rowtgl", "aria-expanded": "false", "aria-label": "行の詳細を開く" }, chev());
+      tgl.addEventListener("click", function () { var open = detail.hidden; detail.hidden = !open; tgl.setAttribute("aria-expanded", open ? "true" : "false"); });
+      append(row, [
+        el("span", { role: "cell" }, tgl),
+        el("span", { class: "xc-comp", role: "cell" }, el("span", { class: "n", text: t.text, title: t.text })),
+        el("span", { role: "cell" }, who(t.owner, 22)),
+        el("span", { role: "cell" }, pill(t.state)),
+        el("span", { role: "cell" }, due(t.due)),
+        el("span", { class: "xc-desc", role: "cell", title: t.wp || "", text: t.wp || "" })
+      ]);
+      return [row, detail];
+    }
+    function taskVisible(t) {
+      if (X.scope && t.owner !== X.scope) return false;
+      if (TF.state && t.state !== TF.state) return false;
+      if (TF.owner && t.owner !== TF.owner) return false;
+      if (TF.late && !X.isLate(t)) return false;
+      return true;
+    }
+    function applyTaskFilters() {
+      var shown = 0;
+      taskEls.cards.forEach(function (c) { var v = taskVisible(c.t); c.n.hidden = !v; if (v) shown++; });
+      taskEls.rows.forEach(function (r) { var v = taskVisible(r.t); r.n.hidden = !v; if (!v) { r.d.hidden = true; var b = r.n.querySelector(".tp-rowtgl"); if (b) b.setAttribute("aria-expanded", "false"); } });
+      doc.querySelectorAll("[data-lane]").forEach(function (col) {
+        var n = 0; col.querySelectorAll(".tkb-task").forEach(function (c) { if (!c.hidden) n++; });
+        col.querySelector("[data-lane-n]").textContent = String(n);
+        col.querySelector("[data-lane-empty]").hidden = n > 0;
+      });
+      var cnt = doc.querySelector("[data-task-count]"); if (cnt) cnt.textContent = shown + " / " + X.tasks.length + " 件";
+      var emp = doc.querySelector("[data-task-empty]"); if (emp) emp.hidden = shown > 0;
+      var os = doc.querySelector("[data-owner-filter]"); if (os) { os.disabled = !!X.scope; if (X.scope) os.value = ""; }
+    }
+
+    /* ======================================================
+       メンバー（人カード）
+       ====================================================== */
+    function renderMembers(host) {
+      clear(host);
+      var sum = el("div", { class: "dna-eyebrow-row" }, [
+        el("span", { class: "dna-eyebrow" }, [svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, [svg("circle", { cx: 9, cy: 8, r: 3.4, "stroke-width": 1.7 }), svg("path", { d: "M3.5 19a5.5 5.5 0 0 1 11 0", "stroke-width": 1.7, "stroke-linecap": "round" })]), "体制", el("span", { class: "sub", text: "— " + X.members.length + "人" })]),
+        el("div", { class: "right" }, el("div", { class: "tp-members-sum" }, [
+          el("span", {}, ["現役タスク ", el("b", { text: X.tasks.length }), "件"]),
+          el("span", { class: "late" }, ["遅れ ", el("b", { text: X.lateTasks.length }), "件"]),
+          el("span", {}, ["今月の稼働 合計 ", el("b", { text: totalLoad() + "%" })])
+        ]))
+      ]);
+      host.appendChild(sum);
+      var grid = el("div", { class: "tp-people" });
+      X.members.forEach(function (m) { grid.appendChild(personCard(m)); });
+      host.appendChild(grid);
+    }
+    function monthKey() { return (X.today.getMonth() + 1) + "月"; }
+    function totalLoad() { var mk = monthKey(), s = 0; X.members.forEach(function (m) { s += (m.load && m.load[mk]) || 0; }); return s; }
+
+    function personCard(m) {
+      var mine = X.tasks.filter(function (t) { return t.owner === m.name; });
+      var late = mine.filter(X.isLate);
+      var kdi = (D.kdi || []).filter(function (k) { return k.owner === m.name; });
+      var card = el("article", { class: "dna-card tp-person", "data-member-card": m.name });
+      var ph = el("div", { class: "ph" }, [
+        ava(m.name, 40),
+        el("div", { class: "t" }, [el("span", { class: "n", text: m.name, title: m.name }), el("span", { class: "r", text: m.role || "—", title: m.role || "" })]),
+        el("div", { class: "right" }, [el("span", { class: "dna-status info", "data-me-mark": "", hidden: true, text: "見る人" }), late.length ? pill("遅れ " + late.length, "down") : null])
+      ]);
+      card.appendChild(ph);
+      var grid = el("div", { class: "tp-person-grid" });
+      grid.appendChild(el("div", { class: "tp-blk" }, [el("span", { class: "k", text: "担当の束（A＝責任者・R＝実行）" }), raciTags(m.raci)]));
+      grid.appendChild(el("div", { class: "tp-blk" }, [el("span", { class: "k", text: "稼働（月別）" }), loadSvg(m.load)]));
+      var b3 = el("div", { class: "tp-blk" }, el("span", { class: "k", text: "現役タスク" }));
+      b3.appendChild(el("span", { class: "big" }, [mine.length, el("small", { text: "件" }), late.length ? el("span", { class: "late", text: "遅れ " + late.length }) : null]));
+      var counts = {}; mine.forEach(function (t) { counts[t.state] = (counts[t.state] || 0) + 1; });
+      var sb = stackBar(counts, TSTATES, mine.length); sb.style.marginTop = "6px"; sb.style.height = "8px"; b3.appendChild(sb);
+      var lgd = el("div", { class: "tp-stack-legend", style: "margin-top:6px;font-size:11.5px;gap:4px 10px" });
+      TSTATES.forEach(function (st) { if (counts[st]) lgd.appendChild(el("span", {}, [el("i", { style: "background:" + stackColor(st) }), st + " ", el("b", { text: counts[st] })])); });
+      if (!mine.length) lgd.appendChild(el("span", { text: "現役タスクなし" }));
+      b3.appendChild(lgd);
+      grid.appendChild(b3);
+      var b4 = el("div", { class: "tp-blk" }, el("span", { class: "k", text: "今週の行動量" }));
+      if (kdi.length) b4.appendChild(kdiRows(kdi)); else b4.appendChild(el("p", { class: "tp-note", style: "margin:0", text: "—" }));
+      grid.appendChild(b4);
+      var next = mine.slice().sort(function (a, b) { return String(a.due).localeCompare(String(b.due)); })[0];
+      var b5 = el("div", { class: "tp-blk wide" }, el("span", { class: "k", text: "次の期限" }));
+      if (next) b5.appendChild(el("div", { class: "tp-next" }, [due(next.due), el("span", { class: "tx", text: next.text, title: next.text }), pill(next.state)]));
+      else b5.appendChild(el("p", { class: "tp-note", style: "margin:0", text: "—" }));
+      grid.appendChild(b5);
+      card.appendChild(grid);
+      var fb = [];
+      if (m.load_note) fb.push(el("div", { class: "li" }, [el("span", { text: "稼働の中身" }), el("b", { text: m.load_note })]));
+      if (m.stakeholder) {
+        var s = m.stakeholder;
+        fb.push(el("div", { class: "li" }, [el("span", { text: "関与" }), el("b", { text: s.engagement + (s.engagement_desired && s.engagement_desired !== s.engagement ? " → 望ましい: " + s.engagement_desired : "（望ましい水準）") + " ・ 影響力 " + s.influence + " ・ 関心 " + s.interest })]));
+        if (s.next_step) fb.push(el("div", { class: "li" }, [el("span", { text: "次の一手" }), el("b", { text: s.next_step })]));
+      }
+      if (fb.length) card.appendChild(fold("関与と次の一手", fb));
+      return card;
+    }
+    function loadSvg(load) {
+      var keys = Object.keys(load || {}), W = 220, H = 56, base = 40, top = 6, n = keys.length || 1, slot = W / n, bw = Math.min(28, slot * 0.5);
+      var s = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "tp-load", role: "img", "aria-label": "稼働 " + keys.map(function (k) { return k + " " + load[k] + "%"; }).join("、") });
+      var defs = svg("defs"), g = svg("linearGradient", { id: "tp-grad-v", x1: "0", y1: "0", x2: "0", y2: "1" });
+      g.appendChild(svg("stop", { offset: "0", class: "tp-stop-b", "stop-color": "#35c3e8" })); g.appendChild(svg("stop", { offset: "1", class: "tp-stop-a", "stop-color": "#2f7bf2" }));
+      defs.appendChild(g); s.appendChild(defs);
+      var mk = monthKey();
+      keys.forEach(function (k, i) {
+        var v = +load[k] || 0, h = Math.max(2, (base - top) * clamp01(v / 100)), x = slot * i + (slot - bw) / 2, hot = k === mk;
+        s.appendChild(svg("rect", { x: x.toFixed(1), y: (base - h).toFixed(1), width: bw, height: h.toFixed(1), rx: 3, class: "bar" + (hot ? " hot" : "") }));
+        s.appendChild(svg("text", { x: (x + bw / 2).toFixed(1), y: (base - h - 3).toFixed(1), class: "pc", "text-anchor": "middle", text: v + "%" }));
+        s.appendChild(svg("text", { x: (x + bw / 2).toFixed(1), y: H - 3, class: "lb" + (hot ? " hot" : ""), "text-anchor": "middle", text: k }));
+      });
+      return s;
+    }
+
+    /* ======================================================
+       会議（前回 → 今週 → 次回）
+       ====================================================== */
+    function renderMeeting(host) {
+      clear(host);
+      var flow = el("div", { class: "tp-flow" });
+      flow.appendChild(prevMeetingCard());
+      flow.appendChild(el("span", { class: "tp-flow-arrow", "aria-hidden": "true" }, svg("svg", { viewBox: "0 0 24 24" }, svg("path", { d: "M5 12h13M13 6l6 6-6 6", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round" }))));
+      flow.appendChild(thisWeekCard());
+      flow.appendChild(el("span", { class: "tp-flow-arrow", "aria-hidden": "true" }, svg("svg", { viewBox: "0 0 24 24" }, svg("path", { d: "M5 12h13M13 6l6 6-6 6", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round" }))));
+      flow.appendChild(nextMeetingCard());
+      host.appendChild(flow);
+      /* 決めたこと */
+      host.appendChild(el("div", { class: "dna-eyebrow-row" }, el("span", { class: "dna-eyebrow" }, [svg("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, svg("path", { d: "m5 12.5 4.5 4.5L19 7.5", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" })), "決めたこと", el("span", { class: "sub", text: "— DEC＝もう決まったことと、その理由" })])));
+      var dc = el("section", { class: "dna-card", "aria-label": "決めたこと" });
+      var dl = el("div", { class: "tp-dec" });
+      (D.decisions || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }).forEach(function (d) {
+        var r = el("div", { class: "r" });
+        r.appendChild(el("span", { class: "dt", text: fmtMDW(pd(d.date)) }));
+        r.appendChild(el("span", { class: "tx", title: shortId(d.id), "data-id": shortId(d.id) }, [d.text]));
+        if (d.why) r.appendChild(fold("理由", el("p", { text: d.why })));
+        dl.appendChild(r);
+      });
+      if (!(D.decisions || []).length) dl.appendChild(el("p", { class: "tp-note", text: "決めたことはまだありません。" }));
+      dc.appendChild(dl);
+      host.appendChild(dc);
+    }
+    function sec(titleKids, small, kids) {
+      var s = el("div", { class: "sec" });
+      var h = el("div", { class: "h" }, titleKids); if (small) h.appendChild(el("small", { text: small }));
+      s.appendChild(h); append(s, kids);
+      return s;
+    }
+    function prevMeetingCard() {
+      var LM = D.last_meeting;
+      var card = el("section", { class: "dna-card tp-mtg", "aria-label": "前回の会議" });
+      if (!LM) {
+        card.appendChild(el("div", { class: "tp-mtg-head" }, [el("span", { class: "stage", text: "前回" }), el("div", { class: "d" }, el("b", { text: "前回の会議録はまだありません" }))]));
+        return card;
+      }
+      card.appendChild(el("div", { class: "tp-mtg-head" }, [
+        el("span", { class: "stage", text: "前回" }),
+        el("div", { class: "d" }, [el("b", { text: fmtMDW(pd(LM.date)) + " " + (LM.time || "") }), el("small", { text: (LM.minutes ? LM.minutes + "分 ・ " : "") + "進行 " + (LM.facilitator || "—") + " ・ " + days(pd(LM.date), X.today) + "日前" + ((LM.title || "").replace(/[\u24ea\u2460-\u2468]/g, function(c){ return c === "\u24ea" ? "0" : String(String(c).charCodeAt(0) - 0x245f); }) ? " ・ " + LM.title : "") })])
+      ]));
+      /* 検収 */
+      var rp = pct(LM.review_done, LM.review_due);
+      var s1 = sec(["検収 ", el("b", { text: rateText(LM.review_done, LM.review_due) })], hasRate(LM.review_due) ? "完了 " + LM.review_done + " / 期限が来た " + LM.review_due + "件" : "前回は期限が来たタスクがありませんでした", [
+        el("div", { class: "tp-rate", style: "margin:0 0 8px" }, el("u", {}, el("i", { style: "width:" + rp + "%" }))),
+        el("div", { class: "tp-check" }, (LM.review || []).map(function (r) {
+          var done = r.state === "完了";
+          return el("div", { class: "r", "data-owner-row": r.owner }, [
+            el("span", { class: "ck" + (done ? " on" : ""), "aria-hidden": "true" }, done ? checkIcon() : null),
+            el("span", { class: "tx", title: r.task }, [r.task, el("small", { text: r.owner + (r.note && r.note !== "—" ? " ・ " + r.note : "") })]),
+            el("span", { class: "right" }, pill(r.state))
+          ]);
+        }))
+      ]);
+      card.appendChild(s1);
+      /* 決めたこと */
+      if (LM.decisions && LM.decisions.length) card.appendChild(sec(["決めたこと"], null, el("div", { class: "tp-pills" }, LM.decisions.map(function (id) { var d = (D.decisions || []).filter(function (x) { return x.id === id; })[0]; return el("span", { class: "dna-tag t-blue", title: shortId(id) + (d ? "  " + d.text : ""), "data-id": shortId(id), text: d ? d.text : "決めたこと" }); }))));
+      /* アクション → いま */
+      var ap = pct(LM.actions_tasked, LM.actions_total);
+      card.appendChild(sec(["決めたアクション ", el("b", { text: LM.actions_total })], "タスクになった " + ap + "%" + (LM.actions_held ? " ・ 保留 " + LM.actions_held : ""), el("div", { class: "tp-check" }, (LM.actions || []).map(function (a) {
+        var t = a.task ? X.taskById[a.task] : null;
+        var st = t ? t.state : "終わった";
+        return el("div", { class: "r", "data-owner-row": a.owner }, [
+          el("span", { class: "ck" + (!t ? " on" : ""), "aria-hidden": "true" }, !t ? checkIcon() : null),
+          el("span", { class: "tx", title: a.text }, [a.text, el("small", { text: a.owner + " ・ " + (a.dod || "") })]),
+          el("span", { class: "right" }, [due(a.due, { done: !t }), pill(st, t ? null : "is-neutral")])
+        ]);
+      }))));
+      if (LM.notes && LM.notes.length) {
+        var RT = { a: "次回議題", b: "決定にする", c: "手順にする" };
+        card.appendChild(fold("気づき " + LM.notes.length + "件", LM.notes.map(function (n) { return el("div", { class: "li", style: "align-items:flex-start" }, [el("span", { text: RT[n.route] || n.route }), el("b", { text: n.text + (n.detail ? " → " + n.detail : "") })]); })));
+      }
+      return card;
+    }
+    function thisWeekCard() {
+      var O = D.output || {};
+      var card = el("section", { class: "dna-card tp-mtg", "aria-label": "今週" });
+      card.appendChild(el("div", { class: "tp-mtg-head" }, [
+        el("span", { class: "stage now", text: "今週" }),
+        el("div", { class: "d" }, [el("b", { text: fmtMDW(X.monday) + " → " + fmtMDW(X.sunday) }), el("small", { text: "第 " + X.weekNo + "週 / 全 " + X.totalWeeks + "週 ・ 基準日 " + fmtYMD(X.today) })])
+      ]));
+      if (O.tasks_due_week != null) {
+        var ep = pct(O.tasks_done_week, O.tasks_due_week);
+        card.appendChild(sec(["実行率 ", el("b", { text: ep + "%" })], "完了 " + O.tasks_done_week + " / 期限が来た " + O.tasks_due_week + "件", el("div", { class: "tp-rate", style: "margin:0" }, el("u", {}, el("i", { style: "width:" + ep + "%" })))));
+      }
+      /* 遅れ */
+      card.appendChild(sec(["遅れ ", el("b", { text: X.lateTasks.length })], "期限が過ぎてまだ現役", X.lateTasks.length ? el("div", { class: "tp-check" }, X.lateTasks.map(function (t) {
+        return el("div", { class: "r", "data-owner-row": t.owner }, [el("span", { class: "ck", "aria-hidden": "true" }), el("span", { class: "tx", title: t.text }, [t.text, el("small", { text: t.owner })]), el("span", { class: "right" }, [due(t.due), pill(t.state)])]);
+      })) : el("p", { class: "tp-note", style: "margin:0", text: "遅れはありません。" })));
+      /* 決めること（着地の比較） */
+      var ds = el("div", { class: "tp-decide" });
+      (D.decide || []).forEach(function (d, i) {
+        var r = el("div", { class: "tp-decide-row" });
+        r.appendChild(el("span", { class: "no", text: d.no != null ? d.no : i + 1 }));
+        r.appendChild(el("div", { class: "t" }, [el("b", { text: d.title }), el("span", { class: "who" }, [ava(d.owner, 16), el("span", { text: d.owner })])]));
+        var lv = d.landing_lever || {}, land = X.landing(lv.pace_weekly, lv.conv_rate);
+        if (land != null) r.appendChild(el("div", { class: "tp-land" }, [el("span", { class: "lbl", text: "採ると着地" }), el("u", {}, [el("i", { style: "width:" + clamp01(land / K.to_be) * 100 + "%" }), el("span", { class: "goalmark", "aria-hidden": "true" })]), el("b", { text: fmtNum(land) }, el("small", { text: K.unit }))]));
+        ds.appendChild(r);
+      });
+      if (X.landCur != null) ds.appendChild(el("div", { class: "tp-land base" }, [el("span", { class: "lbl", text: "決めずにこのまま" }), el("u", { class: "base" }, [el("i", { style: "width:" + clamp01(X.landCur / K.to_be) * 100 + "%" }), el("span", { class: "goalmark", "aria-hidden": "true" })]), el("b", { text: fmtNum(X.landCur) }, el("small", { text: K.unit }))]));
+      card.appendChild(sec(["決めること ", el("b", { text: (D.decide || []).length })], "目標 " + K.to_be + K.unit + " に対する着地", ds));
+      return card;
+    }
+    function nextMeetingCard() {
+      var NM = D.next_meeting || {};
+      var card = el("section", { class: "dna-card tp-mtg", "aria-label": "次回の会議" });
+      card.appendChild(el("div", { class: "tp-mtg-head" }, [
+        el("span", { class: "stage", text: "次回" }),
+        el("div", { class: "d" }, [el("b", { text: fmtMDW(pd(NM.date)) + " " + (NM.time || "") }), el("small", { text: (NM.minutes ? NM.minutes + "分 ・ " : "") + (NM.kind || "") + (NM.date ? " ・ " + days(X.today, pd(NM.date)) + "日後" : "") + (NM.slot_label ? " ・ " + NM.slot_label : "") })])
+      ]));
+      var att = NM.attendees || [];
+      card.appendChild(sec(["出席 ", el("b", { text: att.length })], null, el("div", { class: "tp-faces" }, att.map(function (n) { var w = who(n, 16); w.setAttribute("data-owner-row", n); return w; }))));
+      var ag = el("div", { class: "tp-agenda" });
+      var di = NM.decide_index, dn = (D.decide || []).length;
+      (NM.agenda || []).forEach(function (a, i) {
+        var isDecide = di != null && i >= di && i < di + dn;
+        ag.appendChild(el("div", { class: "r" + (isDecide ? " is-decide" : "") }, [el("span", { class: "no", text: i + 1 }), el("span", { text: a }), isDecide ? el("span", { class: "dna-tag t-blue", text: "決める" }) : el("span")]));
+      });
+      card.appendChild(sec(["議題 ", el("b", { text: (NM.agenda || []).length })], "青い行＝この会議で決めること", ag));
+      card.appendChild(sec(["会議の前日までに"], null, el("div", { class: "tp-before" }, [
+        el("div", { class: "r" }, [el("span", { class: "w", text: "担当" }), el("span", { text: "自分のタスクの状態と期限を更新する" })]),
+        el("div", { class: "r" }, [el("span", { class: "w", text: labelPM() }), el("span", { text: "計器盤の数字と「今週の一言」を更新する（更新が会議の入場券）" })])
+      ])));
+      return card;
+    }
+
+    /* ---------- 脚 ---------- */
+    function glossaryFold() {
+      var G = [
+        ["KGI", "最終目標。この計画で最後に達成する1つの数"],
+        ["KPI", "途中の数字。最終目標に届くかを手前で測る"],
+        ["KDI", "今週の行動量。自分たちで動かせる行動の数"],
+        ["WP（束）", "成果物のかたまり。関係するタスクをまとめた単位"],
+        ["A ／ R", "A＝その束の説明責任を持つ人（各束1人） ／ R＝実行する人"],
+        ["決めたこと", "会議で確定し、記録に残した判断（DEC）"],
+        ["リスク", "まだ起きていないが、起きると計画に響くこと（RSK）"],
+        ["課題", "すでに起きていて、いま対応しているつまずき（ISS）"],
+        ["律速", "全体の速さを決めている一段。ここを直さないと他を足しても速くならない"],
+        ["着地", "いまのまま、またはその案を採ったときに、期限の日に届く数（試算）"],
+        ["検収", "前回決めたことが終わったかを、次の会議の最初に確かめること"],
+        ["C ／ I", "C＝相談を受ける人 ／ I＝結果を共有される人（A＝説明責任・R＝実行 と対になる）"],
+        ["見込み", "いまの進み方のまま期限を迎えたときに届く数（試算）"],
+        ["実行率", "完了したタスク ÷ 期限が来たタスク"],
+        ["実施率", "今週の実績 ÷ 週の予定（行動量で使う）"],
+        ["稼働", "その人の時間のうち、このプロジェクトに使う割合"],
+        ["鮮度", "その数字がいつ時点のものか"],
+        ["投影", "正本を映しただけの画面。ここを直しても正本は変わらない"]
+      ];
+      var dl = el("div", { class: "tp-gloss" });
+      G.forEach(function (g) { dl.appendChild(el("div", {}, [el("b", { text: g[0] }), el("span", { text: g[1] })])); });
+      return fold("ことば（この画面に出る言葉の意味）", dl);
+    }
+    function renderFooter(host) {
+      clear(host);
+      var gf = el("div", { class: "tp-fold tp-gloss-wrap" });
+      gf.appendChild(glossaryFold());
+      host.appendChild(gf);
+      append(host, [
+        el("span", { "data-sample-only": "" }, ["データは", el("b", { text: SAMPLE_WORD }), "です（数値・人名はすべて" + SAMPLE_WORD2 + "）。業務判断には使えません。正本を自分たちの値に替えて作り直すと、この画面が自分たちの数字になります。"]),
+        el("br", { "data-sample-only": "" }),
+        D.headline && D.headline.update_rule ? el("span", { text: D.headline.update_rule }) : null,
+        el("br"),
+        el("span", { text: "画面の作り直し日 " + (D.meta && D.meta.generated_at ? D.meta.generated_at : "—") + " ・ 基準日 " + fmtYMD(X.today) + " ・ この画面は投影で、正本は " + (D.project.org || "") + " のプロジェクト記録です。" })
+      ]);
+    }
+  }
+})();
+</script>
+</body>
+</html>

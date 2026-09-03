@@ -9,6 +9,7 @@
 | `01_company-strategy/` | 会社の方向性・ビジョン・年度計画 |
 | `02_competitive-research/` | 競合調査・市場トレンド |
 | `03_ai-product-development/` | AIを活用した商品開発のアイデア・調査・プロジェクト |
+| `04_project-operations/` | 案件の運転（正本・週次会議・運転席）。いまは人材プロジェクトの見本 |
 | `_templates/` | 各種記入フォーマット（テンプレート） |
 
 ## 使い方

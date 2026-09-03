@@ -1,0 +1,18 @@
+# names.applied.yml — いまこの repo に入っている値の控え（機械が書く・手で直さない）
+# 名前を変えるとき: names.yml の value を新しい値にして `python3 tools/apply_names.py --rename` を実行する。
+schema: talent-pj-names-applied/v1
+values:
+  ORG_NAME_JA: "サンプル株式会社"
+  REPO_NAME: "talent-sample"
+  PROJECT_ID: "PJ-2026Q3-talent-sample"
+  PROJECT_NAME_JA: "人材プロジェクト（サンプル）"
+  PROJECT_SLUG: "talent-sample"
+  LEADER_NAME: "リーダー（サンプル）"
+  PM_NAME: "PM（サンプル）"
+  APPROVER_NAME: "承認者（サンプル）"
+  OUR_ORG_NAME_JA: "支援側（サンプル）"
+  OUR_CONTACT_NAME: "支援側担当（サンプル）"
+  PERIOD_START: "2026-08-17"
+  PERIOD_END: "2026-11-27"
+  WEEKLY_MEETING_SLOT: "毎週月曜 09:00〜10:00（サンプル）"
+  DASHBOARD_URL: ""
