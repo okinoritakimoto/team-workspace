@@ -8,7 +8,7 @@ AIを活用した新サービス・商品のアイデア・調査・プロジェ
 |---|---|
 | `ideas/` | アイデア・企画メモ |
 | `research/` | AI技術・ツール調査レポート |
-| `projects/` | 実際に進行中の開発プロジェクト |
+| `projects/` | 実際に進行中の開発プロジェクト（例: [`youlabo-sns-kit/`](projects/youlabo-sns-kit/README.md) — SNS発信〜商品販売の90タスクを Claude Code の `/yl` で回すキット） |
 
 ## 使い方
 
