@@ -9,6 +9,7 @@
 | `competitor-list.md` | 競合企業の一覧とサマリー |
 | `competitors/` | 各社ごとの詳細調査レポート |
 | `market-trends/` | 業界トレンド・市場動向レポート |
+| `slack-digest/` | Slack #06-ai部屋 の定期まとめ（自動更新） |
 
 ## 使い方
 
